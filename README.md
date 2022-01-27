@@ -1,2 +1,2 @@
-# regression-transformer
+# regression transformer
 ICML submission code
