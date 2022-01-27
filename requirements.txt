@@ -1,0 +1,6 @@
+transformers==v3.1.0
+torch==1.7.1
+tqdm
+numpy
+modlamp>=4.3.0
+selfies==1.0.4

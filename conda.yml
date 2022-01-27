@@ -1,0 +1,12 @@
+name: terminator
+channels:
+  - https://conda.anaconda.org/rdkit
+dependencies:
+  - rdkit=2019.03.1
+  - python=3.7
+  - pip>=19.1,<20.3
+  - pip:
+    - transformers==v3.1.0
+    - -r file:requirements.txt
+    - -r file:dev_requirements.txt
+    - -e .
