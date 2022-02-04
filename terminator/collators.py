@@ -27,7 +27,7 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
         """
         if batch.size(1) % 2 != 0:
             return torch.cat([batch, torch.ones(batch.size(0), 1).long() * val], axis=1)
-        return batch
+        return batch.long()
 
     def attention_mask(self, batch: torch.Tensor, dropout: float = 0.0) -> torch.Tensor:
         attention_mask = (~(batch == 0)).to(float)
@@ -153,6 +153,78 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
             # fmt: on
 
         return first_ent_pos, last_ent_pos
+
+@dataclass
+class MaskedTextCollator(BaseCollator):
+    """A lazy data collator that expects the masking to be done already.
+    Imitates the behavior of `DataCollatorForPermutationLanguageModeling`, but does not
+    perform any probabilistic masking. Instead expects samples to be passed with masked
+    tokens, e.g.:
+        <QED>0.[MASK][MASK]8|CCN[MASK][MASK]CO
+    NOTE: The masking token has to be tokenizer.mask_token and tokenizer.mask_token_id
+        has to be implemented
+
+    This can be useful in in inference mode and model deployment
+    """
+
+    def __init__(self, tokenizer: PreTrainedTokenizer):
+        """
+        Args:
+            tokenizer (PreTrainedTokenizer): Tokenizer used for splitting.
+        """
+        self.tokenizer = tokenizer
+
+    def __call__(
+        self, examples: List[Union[List[int], torch.Tensor, Dict[str, torch.Tensor]]]
+    ) -> Dict[str, torch.Tensor]:
+
+        if isinstance(examples[0], (dict, BatchEncoding)):
+            examples = [e["input_ids"] for e in examples]
+        batch = self.finalize(self._tensorize_batch(examples))
+        attention_mask = self.attention_mask(batch)
+        inputs, perm_mask = self.mask_tokens(batch)
+        return {
+            "input_ids": inputs,
+            "perm_mask": perm_mask,
+            "attention_mask": attention_mask,
+        }
+
+    def mask_tokens(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        if self.tokenizer.mask_token is None:
+            raise ValueError(
+                "This tokenizer does not have a mask token which is necessary for permutation language modeling. Please add a mask token if you want to use this tokenizer."
+            )
+
+        if inputs.size(1) % 2 != 0:
+            raise ValueError(
+                "This collator requires that sequence lengths be even to create a leakage-free perm_mask. Please see relevant comments in source code for details."
+            )
+
+        # Mask all unknown tokens
+        masked_indices = torch.full(inputs.shape, 0, dtype=torch.bool)
+        masked_indices[torch.where(inputs == self.tokenizer.mask_token_id)] = 1
+
+        special_tokens_mask = torch.tensor(
+            [
+                self.tokenizer.get_special_tokens_mask(
+                    val, already_has_special_tokens=True
+                )
+                for val in inputs.tolist()
+            ],
+            dtype=torch.bool,
+        )
+        masked_indices.masked_fill_(special_tokens_mask, value=0.0)
+        padding_mask = inputs.eq(self.tokenizer.mask_token_id)
+        masked_indices.masked_fill_(padding_mask, value=0.0)
+
+        # Mask indicating non-functional tokens (all but [SEP], [CLS], padding, etc.)
+        non_func_mask = ~(padding_mask & special_tokens_mask)
+
+        inputs[masked_indices] = self.tokenizer.mask_token_id
+
+        perm_mask = get_permutation_order(inputs, masked_indices, non_func_mask)
+        return inputs, perm_mask
 
 
 @dataclass
