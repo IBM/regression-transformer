@@ -1,10 +1,16 @@
 """Tokenization utilties for exrepssions."""
+import logging
 import re
+import sys
 from typing import Dict, List, Tuple
-import transformers
+
 import torch
-from selfies import decoder, split_selfies
+import transformers
+from selfies import decoder
 from transformers import BertTokenizer
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 
@@ -88,7 +94,32 @@ class SelfiesTokenizer(CharacterTokenizer):
             expression_tokenizer: Separator token for properties and molecule.
                 Defaults to '|'.
         """
-        self.tokenizer = lambda x: list(split_selfies(x))
+        self.tokenizer = self.tokenize_selfies
+
+    def tokenize_selfies(self, selfies: str) -> List[str]:
+        """Tokenize SELFIES.
+
+        NOTE: Code adapted from selfies package (`def selfies_to_hot`):
+            https://github.com/aspuru-guzik-group/selfies
+
+        Args:
+            selfies (str): a SELFIES representation (character-level).
+
+        Returns:
+            Tokens: the tokenized SELFIES.
+        """
+        logger.info(
+            "tokenize_selfies might differ from selfies new internal `split_selfies` method"
+        )
+        try:
+            selfies = selfies.replace('.', '[.]')  # to allow parsing unbound atoms
+            selfies_char_list_pre = selfies[1:-1].split('][')
+            return [
+                '[' + selfies_element + ']' for selfies_element in selfies_char_list_pre
+            ]
+        except Exception:
+            logger.warning(f'Error in tokenizing {selfies}. Returning empty list.')
+            return ['']
 
 
 class ExpressionTokenizer:
@@ -334,3 +365,43 @@ class ExpressionBertTokenizer(BertTokenizer):
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
+
+
+class InferenceBertTokenizer(ExpressionBertTokenizer):
+    """
+    InferenceBertTokenizer that implements some additional functionalities and
+    sanity check compared to the ExpressionBertTokenizer.
+
+    The primary justification for this class is the necessity to tokenize samples that
+    include the [MASK] token in the sequence.
+    """
+
+    def _tokenize(self, text: str) -> List[str]:
+        """Tokenize a text representing an expression.
+
+        Args:
+            text: text to tokenize.
+
+        Returns:
+            extracted tokens.
+        """
+        if text.startswith('<') and text.endswith('>'):
+            tokens = re.compile(r"\s*(<\w+>)\s").split(text)
+            if len(tokens) != 1:
+                raise ValueError(f'Problem in processing {tokens}')
+            return tokens
+        tokens = super()._tokenize(text)
+        return tokens
+
+    def tokenize(self, *args, **kwargs) -> List[str]:
+        """
+        Overwriting parent class method to ensure an even number of tokens *even if
+        the input contains masked tokens*.
+
+        Returns:
+            A list of tokens
+        """
+        text = super().tokenize(*args, **kwargs)
+        text = text if len(text) % 2 == 0 else text + [self.pad_token]
+        return text
+
