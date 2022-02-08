@@ -6,7 +6,7 @@ from transformers import DataCollatorForPermutationLanguageModeling
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import BatchEncoding
 from transformers.utils import logging
-
+from transformers.data.data_collator import _torch_collate_batch
 from .collator_utils import get_mask, get_permutation_order
 
 logger = logging.get_logger(__name__)
@@ -37,7 +37,7 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
                                                                           torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
-        batch = self.finalize(self._tensorize_batch(examples))
+        batch = _torch_collate_batch(examples, self.tokenizer)
         attention_mask = self.attention_mask(batch)
 
         inputs, perm_mask, target_mapping, labels = self.mask_tokens(batch)
@@ -180,13 +180,21 @@ class MaskedTextCollator(BaseCollator):
 
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
-        batch = self.finalize(self._tensorize_batch(examples))
+        batch = _torch_collate_batch(examples, self.tokenizer)
         attention_mask = self.attention_mask(batch)
         inputs, perm_mask = self.mask_tokens(batch)
+
+        target_mapping = torch.zeros(
+            (inputs.size(0), inputs.size(1), inputs.size(1)), dtype=torch.float32
+        )
+        for i in range(inputs.size(0)):
+            target_mapping[i] = torch.eye(inputs.size(1))
+
         return {
             "input_ids": inputs,
             "perm_mask": perm_mask,
             "attention_mask": attention_mask,
+            "target_mapping": target_mapping,
         }
 
     def mask_tokens(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -216,7 +224,7 @@ class MaskedTextCollator(BaseCollator):
         )
         masked_indices.masked_fill_(special_tokens_mask, value=0.0)
         padding_mask = inputs.eq(self.tokenizer.mask_token_id)
-        masked_indices.masked_fill_(padding_mask, value=0.0)
+        masked_indices.masked_fill_(padding_mask, value=1.0)
 
         # Mask indicating non-functional tokens (all but [SEP], [CLS], padding, etc.)
         non_func_mask = ~(padding_mask & special_tokens_mask)
@@ -486,7 +494,7 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
 
-        batch = self.finalize(self._tensorize_batch(examples))
+        batch = _torch_collate_batch(examples, self.tokenizer)
         inputs, perm_mask, target_mapping, labels, true_prop = self.mask_tokens(batch)
         attention_mask = self.attention_mask(inputs)
         return {
@@ -656,7 +664,7 @@ class ConditionalGenerationTrainCollator(BaseCollator):
                                                                           torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
-        batch = self.finalize(self._tensorize_batch(examples))
+        batch = _torch_collate_batch(examples, self.tokenizer)
         attention_mask = self.attention_mask(batch)
         inputs, perm_mask, target_mapping, labels = self.mask_tokens(batch)
         inputs, true_prop, sample_weights = self.sample_property(inputs)

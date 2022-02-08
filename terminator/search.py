@@ -1,15 +1,24 @@
 """Decoding utilities."""
-import transformers
+import logging
+import sys
+
 import torch
+import transformers
 from torch import nn
 
 from .utils import get_device
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 
 class Search(nn.Module):
     """Base search class."""
+
     def __init__(self, *args, **kwargs):
         super().__init__()
+        if args != () or kwargs != {}:
+            logger.warning(f"Ignoring args: {args} and kwargs: {kwargs}")
         self.device = get_device()
 
     def forward(self, logits: torch.Tensor) -> object:
@@ -45,6 +54,7 @@ class Search(nn.Module):
 
 class GreedySearch(Search):
     """"Greedy search."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -78,6 +88,7 @@ class GreedySearch(Search):
 
 class SamplingSearch(Search):
     """"Sampling search."""
+
     def __init__(self, temperature: float = 1.0, *args, **kwargs):
         """
         Initialize the sampling search.
@@ -102,7 +113,9 @@ class SamplingSearch(Search):
         """
         super().forward(logits)
         probabilities = torch.softmax(logits.div(self.temperature), 2)
-        return torch.stack([torch.multinomial(probability, 1) for probability in probabilities]).squeeze(dim=-1)
+        return torch.stack(
+            [torch.multinomial(probability, 1) for probability in probabilities]
+        ).squeeze(dim=-1)
 
     def step(self, logits: torch.Tensor) -> torch.Tensor:
         """
@@ -116,7 +129,9 @@ class SamplingSearch(Search):
         """
         super().step(logits)
         probabilities = torch.softmax(logits.div(self.temperature), 1)
-        return torch.stack([torch.multinomial(probability, 1) for probability in probabilities])
+        return torch.stack(
+            [torch.multinomial(probability, 1) for probability in probabilities]
+        )
 
 
 SEARCH_FACTORY = {"greedy": GreedySearch, "sample": SamplingSearch}
