@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 
 import torch
 import transformers
-from selfies import decoder
+from .selfies import decoder
 from transformers import BertTokenizer
 
 logger = logging.getLogger(__name__)
