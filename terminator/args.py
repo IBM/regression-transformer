@@ -1,7 +1,8 @@
-from transformers.training_args import TrainingArguments
 from dataclasses import dataclass, field
 from typing import Optional
+
 from transformers import MODEL_WITH_LM_HEAD_MAPPING
+from transformers.training_args import TrainingArguments
 
 MODEL_CONFIG_CLASSES = list(MODEL_WITH_LM_HEAD_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -21,13 +22,14 @@ class CustomTrainingArguments(TrainingArguments):
     # Was introduced only in transformers 3.4.0
     eval_accumulation_steps: Optional[int] = field(
         default=None,
-        metadata={"help": "Number of predictions steps to accumulate before moving the tensors to the CPU."},
+        metadata={
+            "help": "Number of predictions steps to accumulate before moving the tensors to the CPU."
+        },
     )
     training_config_path: Optional[str] = field(
         default=None,
         metadata={
-            "help":
-            """
+            "help": """
             Path to a file specifying the training objective hyperparameter.
 
             Defaults to None, meaning the vanilla PLM objective is used.
@@ -65,25 +67,33 @@ class ModelArguments:
     model_name_or_path: Optional[str] = field(
         default=None,
         metadata={
-            "help":
-            "The model checkpoint for weights initialization. Leave None if you want to train a model from scratch."
+            "help": "The model checkpoint for weights initialization. Leave None if you want to train a model from scratch."
         },
     )
     model_type: Optional[str] = field(
         default=None,
-        metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
+        metadata={
+            "help": "If training from scratch, pass a model type from the list: "
+            + ", ".join(MODEL_TYPES)
+        },
     )
     config_name: Optional[str] = field(
         default=None,
-        metadata={"help": "Pretrained config name or path if not the same as model_name"},
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
     )
     tokenizer_name: Optional[str] = field(
         default=None,
-        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
     )
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Where do you want to store the pretrained models downloaded from s3"},
+        metadata={
+            "help": "Where do you want to store the pretrained models downloaded from s3"
+        },
     )
 
 
@@ -99,4 +109,6 @@ class EvalArguments:
     """
 
     eval_file: str = field(metadata={"help": "Path to the data used for evaluation"})
-    param_path: str = field(metadata={"help": "Path to the .json file with evaluation parameter"})
+    param_path: str = field(
+        metadata={"help": "Path to the .json file with evaluation parameter"}
+    )
