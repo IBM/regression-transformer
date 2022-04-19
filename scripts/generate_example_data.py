@@ -4,8 +4,8 @@ Generate example data starting from a .smi file.
 We use QED of molecules as an example.
 """
 
-import os
 import argparse
+import os
 
 from rdkit import Chem
 from rdkit.Chem import QED
@@ -26,7 +26,9 @@ def main() -> None:
             smiles_generator = (line.strip().split("\t")[0] for line in fpr)
             for smiles in smiles_generator:
                 try:
-                    fpw.write(f"<qed>{QED.qed(Chem.MolFromSmiles(smiles)):.4}|{smiles}{os.linesep}")
+                    fpw.write(
+                        f"<qed>{QED.qed(Chem.MolFromSmiles(smiles)):.4}|{smiles}{os.linesep}"
+                    )
                 except Exception:
                     print(f"Problem processing SMILES={smiles}")
 

@@ -1,6 +1,7 @@
-import transformers
-import torch
 from typing import Optional
+
+import torch
+import transformers
 
 
 def get_mask(
@@ -29,7 +30,9 @@ def get_mask(
 
     # Creating the mask and target_mapping tensors
     masked_indices = torch.full(labels.shape, 0, dtype=torch.bool)
-    target_mapping = torch.zeros((labels.size(0), labels.size(1), labels.size(1)), dtype=torch.float32)
+    target_mapping = torch.zeros(
+        (labels.size(0), labels.size(1), labels.size(1)), dtype=torch.float32
+    )
     # If on-/offset for masking are not provided we can mask from start to end
     if mask_start_idxs is None:
         mask_start_idxs = [0] * labels.size(0)
@@ -48,7 +51,9 @@ def get_mask(
         while cur_len < max_len:
             # Sample (length of span of tokens to be masked), take the minimum to avoid
             # that the span length is longer than the molecule length
-            span_length = min(torch.randint(1, max_span_length + 1, (1, )).item(), max_len - cur_len)
+            span_length = min(
+                torch.randint(1, max_span_length + 1, (1,)).item(), max_len - cur_len
+            )
             # Reserve a context of length `context_length = span_length / plm_probability` to surround the span to be masked
             context_length = int(span_length / plm_probability)
             # Sample a starting point `start_index` from the interval `[cur_len, cur_len + context_length - span_length]` and mask tokens `start_index:start_index + span_length`
@@ -56,12 +61,13 @@ def get_mask(
             # the max is needed to avoid that the span starts before cur_len
             start_index = max(
                 min(
-                    cur_len + torch.randint(context_length - span_length + 1, (1, )).item(),
+                    cur_len
+                    + torch.randint(context_length - span_length + 1, (1,)).item(),
                     max_len - span_length,
                 ),
                 cur_len,
             )
-            masked_indices[i, start_index:start_index + span_length] = 1
+            masked_indices[i, start_index : start_index + span_length] = 1
             # Set `cur_len = cur_len + context_length`
             cur_len += context_length
 
@@ -109,7 +115,9 @@ def get_permutation_order(
         # The logic for whether the i-th token can attend on the j-th token based on the factorisation order:
         # 0 (can attend): If perm_index[i] > perm_index[j] or j is neither masked nor a functional token
         # 1 (cannot attend): If perm_index[i] <= perm_index[j] and j is either masked or a functional token
-        perm_mask[i] = (perm_index.reshape((labels.size(1), 1)) <= perm_index.reshape(
-            (1, labels.size(1)))) & masked_indices[i]
+        perm_mask[i] = (
+            perm_index.reshape((labels.size(1), 1))
+            <= perm_index.reshape((1, labels.size(1)))
+        ) & masked_indices[i]
 
     return perm_mask

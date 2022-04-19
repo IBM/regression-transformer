@@ -1,8 +1,9 @@
 import re
 from typing import Any, Dict, Optional
-import transformers
+
 import numpy as np
 import torch
+import transformers
 from torch import Tensor
 from transformers.utils import logging
 
@@ -21,8 +22,16 @@ def get_trainer_dict(dictionary: Dict[str, Any]) -> Dict[str, Any]:
             childclass constructor (`Trainer`).
     """
     keys_to_keep = [
-        "verbose_evaluation", "numerical", "d_model", "vocab_size", "vmax", "model_type", "mem_len", "training_logs",
-        "train_config", "alternating_collator"
+        "verbose_evaluation",
+        "numerical",
+        "d_model",
+        "vocab_size",
+        "vmax",
+        "model_type",
+        "mem_len",
+        "training_logs",
+        "train_config",
+        "alternating_collator",
     ]
     keep_dict = {}
     for keep_key in keys_to_keep:
@@ -57,14 +66,17 @@ def nested_expand_like(arrays, new_seq_length, padding_index=-100):
     """Expand the `arrays` so that the second dimension grows to `new_seq_length`.
     Uses `padding_index` for padding."""
     if isinstance(arrays, (list, tuple)):
-        return type(arrays)(nested_expand_like(x, new_seq_length, padding_index=padding_index) for x in arrays)
+        return type(arrays)(
+            nested_expand_like(x, new_seq_length, padding_index=padding_index)
+            for x in arrays
+        )
 
     result = np.full_like(
         arrays,
         padding_index,
         shape=(arrays.shape[0], new_seq_length) + arrays.shape[2:],
     )
-    result[:, :arrays.shape[1]] = arrays
+    result[:, : arrays.shape[1]] = arrays
     return result
 
 
@@ -107,10 +119,15 @@ class DistributedTensorGatherer:
             If passed, the class assumes the datasets passed to each process are made to be a multiple of this argument
             (by adding samples).
     """
-    def __init__(self, world_size, num_samples, make_multiple_of=None, padding_index=-100):
+
+    def __init__(
+        self, world_size, num_samples, make_multiple_of=None, padding_index=-100
+    ):
         self.world_size = world_size
         self.num_samples = num_samples
-        total_size = world_size if make_multiple_of is None else world_size * make_multiple_of
+        total_size = (
+            world_size if make_multiple_of is None else world_size * make_multiple_of
+        )
         self.total_samples = int(np.ceil(num_samples / total_size)) * total_size
         self.process_length = self.total_samples // world_size
         self._storage = None
@@ -125,14 +142,18 @@ class DistributedTensorGatherer:
         if arrays is None:
             return
         if self._storage is None:
-            self._storage = nested_new_like(arrays, self.total_samples, padding_index=self.padding_index)
+            self._storage = nested_new_like(
+                arrays, self.total_samples, padding_index=self.padding_index
+            )
             self._offsets = list(range(0, self.total_samples, self.process_length))
         else:
             storage_shape = _get_first_shape(self._storage)
             arrays_shape = _get_first_shape(arrays)
             if len(storage_shape) > 1 and storage_shape[1] < arrays_shape[1]:
                 # If we get new arrays that are too big too fit, we expand the shape fo the storage
-                self._storage = nested_expand_like(self._storage, arrays_shape[1], padding_index=self.padding_index)
+                self._storage = nested_expand_like(
+                    self._storage, arrays_shape[1], padding_index=self.padding_index
+                )
         slice_len = self._nested_set_tensors(self._storage, arrays)
         for i in range(self.world_size):
             self._offsets[i] += slice_len
@@ -149,10 +170,13 @@ class DistributedTensorGatherer:
         slice_len = arrays.shape[0] // self.world_size
         for i in range(self.world_size):
             if len(arrays.shape) == 1:
-                storage[self._offsets[i]:self._offsets[i] + slice_len] = arrays[i * slice_len:(i + 1) * slice_len]
+                storage[self._offsets[i] : self._offsets[i] + slice_len] = arrays[
+                    i * slice_len : (i + 1) * slice_len
+                ]
             else:
-                storage[self._offsets[i]:self._offsets[i] +
-                        slice_len, :arrays.shape[1]] = arrays[i * slice_len:(i + 1) * slice_len]
+                storage[
+                    self._offsets[i] : self._offsets[i] + slice_len, : arrays.shape[1]
+                ] = arrays[i * slice_len : (i + 1) * slice_len]
         return slice_len
 
     def finalize(self):
@@ -163,11 +187,15 @@ class DistributedTensorGatherer:
         if self._storage is None:
             return
         if self._offsets[0] != self.process_length:
-            logger.warn("Not all data has been set. Are you sure you passed all values?")
+            logger.warn(
+                "Not all data has been set. Are you sure you passed all values?"
+            )
         return nested_truncate(self._storage, self.num_samples)
 
 
-def torch_pad_and_concatenate(tensor1: Tensor, tensor2: Tensor, padding_index: int = -100) -> Tensor:
+def torch_pad_and_concatenate(
+    tensor1: Tensor, tensor2: Tensor, padding_index: int = -100
+) -> Tensor:
     """Concatenates `tensor1` and `tensor2` on first axis, applying padding on the second if necessary."""
     if len(tensor1.shape) == 1 or tensor1.shape[1] == tensor2.shape[1]:
         return torch.cat((tensor1, tensor2), dim=0)
@@ -180,12 +208,14 @@ def torch_pad_and_concatenate(tensor1: Tensor, tensor2: Tensor, padding_index: i
 
     # Now let's fill the result tensor
     result = tensor1.new_full(new_shape, padding_index)
-    result[:tensor1.shape[0], :tensor1.shape[1]] = tensor1
-    result[tensor1.shape[0]:, :tensor2.shape[1]] = tensor2
+    result[: tensor1.shape[0], : tensor1.shape[1]] = tensor1
+    result[tensor1.shape[0] :, : tensor2.shape[1]] = tensor2
     return result.detach()
 
 
-def numpy_pad_and_concatenate(array1: np.array, array2: np.array, padding_index: str = -100) -> np.array:
+def numpy_pad_and_concatenate(
+    array1: np.array, array2: np.array, padding_index: str = -100
+) -> np.array:
     """Concatenates `array1` and `array2` on first axis, applying padding on the second if necessary."""
     if len(array1.shape) == 1 or array1.shape[1] == array2.shape[1]:
         return np.concatenate((array1, array2), dim=0)
@@ -198,8 +228,8 @@ def numpy_pad_and_concatenate(array1: np.array, array2: np.array, padding_index:
 
     # Now let's fill the result tensor
     result = np.full_like(array1, padding_index, shape=new_shape)
-    result[:array1.shape[0], :array1.shape[1]] = array1
-    result[array1.shape[0]:, :array2.shape[1]] = array2
+    result[: array1.shape[0], : array1.shape[1]] = array1
+    result[array1.shape[0] :, : array2.shape[1]] = array2
     return result
 
 
@@ -212,20 +242,33 @@ def nested_concat(tensors, new_tensors, padding_index=-100):
         new_tensors
     ), f"Expected `tensors` and `new_tensors` to have the same type but found {type(tensors)} and {type(new_tensors)}."
     if isinstance(tensors, (list, tuple)):
-        return type(tensors)(nested_concat(t, n, padding_index=padding_index) for t, n in zip(tensors, new_tensors))
+        return type(tensors)(
+            nested_concat(t, n, padding_index=padding_index)
+            for t, n in zip(tensors, new_tensors)
+        )
     elif isinstance(tensors, torch.Tensor):
-        return torch_pad_and_concatenate(tensors, new_tensors, padding_index=padding_index)
+        return torch_pad_and_concatenate(
+            tensors, new_tensors, padding_index=padding_index
+        )
     elif isinstance(tensors, np.ndarray):
-        return numpy_pad_and_concatenate(tensors, new_tensors, padding_index=padding_index)
+        return numpy_pad_and_concatenate(
+            tensors, new_tensors, padding_index=padding_index
+        )
     else:
         raise TypeError(f"Unsupported type for concatenation: got {type(tensors)}")
 
 
-def distributed_concat(tensor: "torch.Tensor", num_total_examples: Optional[int] = None) -> torch.Tensor:
+def distributed_concat(
+    tensor: "torch.Tensor", num_total_examples: Optional[int] = None
+) -> torch.Tensor:
     try:
         if isinstance(tensor, (tuple, list)):
-            return type(tensor)(distributed_concat(t, num_total_examples) for t in tensor)
-        output_tensors = [tensor.clone() for _ in range(torch.distributed.get_world_size())]
+            return type(tensor)(
+                distributed_concat(t, num_total_examples) for t in tensor
+            )
+        output_tensors = [
+            tensor.clone() for _ in range(torch.distributed.get_world_size())
+        ]
         torch.distributed.all_gather(output_tensors, tensor)
         concat = torch.cat(output_tensors, dim=0)
 

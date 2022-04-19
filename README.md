@@ -55,3 +55,16 @@ python scripts/run_language_modeling.py --output_dir examples/models/xlnet_selfi
 ```
 
 Exemplary model configurations (number of heads, layers, etc.) can be found in the [configs](./configs) folder.
+
+
+## Citation
+If you use the regression transformer, please cite:
+```bib
+@article{born2022regression,
+  title={Regression Transformer: Concurrent Conditional Generation and Regression by Blending Numerical and Textual Tokens},
+  author={Born, Jannis and Manica, Matteo},
+  journal={arXiv preprint arXiv:2202.01338},
+  note={Spotlight talk at ICLR workshop on Machine Learning for Drug Discovery},
+  year={2022}
+}
+```
