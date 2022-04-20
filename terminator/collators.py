@@ -27,14 +27,15 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
         """
         if batch.size(1) % 2 != 0:
             return torch.cat([batch, torch.ones(batch.size(0), 1).long() * val], axis=1)
-        return batch
+        return batch.long()
 
     def attention_mask(self, batch: torch.Tensor, dropout: float = 0.0) -> torch.Tensor:
         attention_mask = (~(batch == 0)).to(float)
         return attention_mask
 
-    def __call__(self, examples: List[Union[List[int], torch.Tensor, Dict[str,
-                                                                          torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+    def __call__(
+        self, examples: List[Union[List[int], torch.Tensor, Dict[str, torch.Tensor]]]
+    ) -> Dict[str, torch.Tensor]:
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
         batch = self.finalize(self._tensorize_batch(examples))
@@ -46,13 +47,23 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
             "perm_mask": perm_mask,
             "target_mapping": target_mapping,
             "labels": labels,
-            "attention_mask": attention_mask
+            "attention_mask": attention_mask,
         }
 
-    def mask(self, inputs: torch.Tensor, masked_indices: torch.Tensor, labels: torch.Tensor,
-             device: str = "cpu") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def mask(
+        self,
+        inputs: torch.Tensor,
+        masked_indices: torch.Tensor,
+        labels: torch.Tensor,
+        device: str = "cpu",
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         special_tokens_mask = torch.tensor(
-            [self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()],
+            [
+                self.tokenizer.get_special_tokens_mask(
+                    val, already_has_special_tokens=True
+                )
+                for val in labels.tolist()
+            ],
             dtype=torch.bool,
             device=device,
         )
@@ -69,7 +80,9 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
 
         return inputs, masked_indices, non_func_mask, labels
 
-    def find_entity_indices(self, inputs: torch.Tensor, entity_to_mask: Optional[int] = None) -> Tuple[List, List]:
+    def find_entity_indices(
+        self, inputs: torch.Tensor, entity_to_mask: Optional[int] = None
+    ) -> Tuple[List, List]:
         """
         Finds the start and end indices of an entity in an input tensor
 
@@ -84,17 +97,26 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
         """
 
         # Find matches for separator
-        sep_matches, sep_token_pos = (inputs == self.separator_token_idx).nonzero(as_tuple=True)
+        sep_matches, sep_token_pos = (inputs == self.separator_token_idx).nonzero(
+            as_tuple=True
+        )
         unique_sep_matches = torch.unique(sep_matches)
-        assert torch.equal(unique_sep_matches,
-                           torch.arange(inputs.size(0))), f"Found samples without separator {unique_sep_matches}"
+        assert torch.equal(
+            unique_sep_matches, torch.arange(inputs.size(0))
+        ), f"Found samples without separator {unique_sep_matches}"
 
         if entity_to_mask is None:
             # We fall back to the trivial case
             logger.debug("Masking randomly across all entities")
             # Find the separator (where textual tokens start)
-            first_ent_pos = [int(max(sep_token_pos[torch.where(sep_matches == s)])) + 1 for s in unique_sep_matches]
-            last_ent_pos = [int(torch.min(torch.where(s == self.tokenizer.sep_token_id)[0]) - 1) for s in inputs]
+            first_ent_pos = [
+                int(max(sep_token_pos[torch.where(sep_matches == s)])) + 1
+                for s in unique_sep_matches
+            ]
+            last_ent_pos = [
+                int(torch.min(torch.where(s == self.tokenizer.sep_token_id)[0]) - 1)
+                for s in inputs
+            ]
             return first_ent_pos, last_ent_pos
 
         # We find the minimal number of entities contained in each sample.
@@ -109,7 +131,9 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
             raise ValueError(f"Cannot mask {entity_to_mask}-th entity, only one found")
 
         if entity_to_mask > num_entities:
-            raise ValueError(f"Did not find {entity_to_mask} but only {num_entities} entities.")
+            raise ValueError(
+                f"Did not find {entity_to_mask} but only {num_entities} entities."
+            )
 
         # If -1, we fix the entity now for this batch
         if entity_to_mask == -1:
@@ -118,37 +142,51 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
         # For each sample find the range of tokens that are considered for masking
 
         # Find matches for entity-separator
-        entsep_matches, entsep_token_pos = (inputs == self.entity_separator_idx).nonzero(as_tuple=True)
+        entsep_matches, entsep_token_pos = (
+            inputs == self.entity_separator_idx
+        ).nonzero(as_tuple=True)
         unique_entsep_matches = torch.unique(entsep_matches)
 
-        assert torch.equal(unique_entsep_matches,
-                           torch.arange(inputs.size(0))), "Found samples with only a single entity"
+        assert torch.equal(
+            unique_entsep_matches, torch.arange(inputs.size(0))
+        ), "Found samples with only a single entity"
 
         # Determine the first token that can be masked
         if entity_to_mask == 0:
             # Special case here because first entity occurs right after the separator
             # Determining the index of last separator in each sample of the batch
-            first_ent_pos = [int(max(sep_token_pos[torch.where(sep_matches == s)])) + 1 for s in unique_sep_matches]
+            first_ent_pos = [
+                int(max(sep_token_pos[torch.where(sep_matches == s)])) + 1
+                for s in unique_sep_matches
+            ]
         else:
             # Determine index of the entity-separator (e.g., '.') that lies right
             # before the entity to be masked
             first_ent_pos = [
-                int(entsep_token_pos[torch.where(entsep_matches == s)][entity_to_mask - 1]) + 1
+                int(
+                    entsep_token_pos[torch.where(entsep_matches == s)][
+                        entity_to_mask - 1
+                    ]
+                )
+                + 1
                 for s in unique_entsep_matches
             ]
 
         # Determine the last token that can be masked
         if entity_to_mask == num_entities - 1:
             # Trivial case because we can mask until the end
-            last_ent_pos = [int(torch.min(torch.where(s == self.tokenizer.sep_token_id)[0]) - 1) for s in inputs]
+            last_ent_pos = [
+                int(torch.min(torch.where(s == self.tokenizer.sep_token_id)[0]) - 1)
+                for s in inputs
+            ]
         else:
             # Determine index of the entity-separator (e.g., '.') that lies right
             # after the entity to be masked
 
             # fmt: off
             last_ent_pos = [
-                int(entsep_token_pos[torch.where(entsep_matches == s)][entity_to_mask]) - 1
-                for s in unique_entsep_matches
+                int(entsep_token_pos[torch.where(entsep_matches == s)][entity_to_mask])
+                - 1 for s in unique_entsep_matches
             ]
             # fmt: on
 
@@ -158,8 +196,15 @@ class BaseCollator(DataCollatorForPermutationLanguageModeling):
 @dataclass
 class SinglePropertyCollator(BaseCollator):
     """Collator class to parse samples for predicting single property."""
-    def __init__(self, tokenizer: PreTrainedTokenizer, property_token: str, mask_token_order: List[int] = None,
-                 num_tokens_to_mask: int = -1, ignore_errors: bool = False):
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        property_token: str,
+        mask_token_order: List[int] = None,
+        num_tokens_to_mask: int = -1,
+        ignore_errors: bool = False,
+    ):
         """
         Args:
             tokenizer (PreTrainedTokenizer): Tokenizer used for splitting.
@@ -188,12 +233,17 @@ class SinglePropertyCollator(BaseCollator):
         self.ignore_errors = ignore_errors
 
         if num_tokens_to_mask > 0 and isinstance(mask_token_order, list):
-            self.tokens_to_mask = torch.Tensor(mask_token_order[:num_tokens_to_mask]).long()
+            self.tokens_to_mask = torch.Tensor(
+                mask_token_order[:num_tokens_to_mask]
+            ).long()
 
         self.separator_token_idx = tokenizer.vocab[tokenizer.expression_separator]
 
-    def mask_tokens(self, inputs: torch.Tensor,
-                    device: str = "cpu") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def mask_tokens(
+        self,
+        inputs: torch.Tensor,
+        device: str = "cpu",
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Only need to overwrite the masking function to create batches where property
         is masked.
@@ -216,7 +266,9 @@ class SinglePropertyCollator(BaseCollator):
 
         # Find matches for property token and separator
         for search_idx in [self.property_token_idx, self.separator_token_idx]:
-            sample_matches, match_positions = (inputs == search_idx).nonzero(as_tuple=True)
+            sample_matches, match_positions = (inputs == search_idx).nonzero(
+                as_tuple=True
+            )
             keep_idxs = list(range(inputs.size(0)))
 
             if list(range(inputs.size(0))) != sample_matches.tolist():
@@ -229,17 +281,23 @@ class SinglePropertyCollator(BaseCollator):
                         match_pos = torch.zeros(inputs.size(0), device=device)
                         keep_idxs = []
                         for sample_idx in range(inputs.size(0)):
-                            sample_sep_pos = match_positions[sample_matches == sample_idx]
+                            sample_sep_pos = match_positions[
+                                sample_matches == sample_idx
+                            ]
                             if len(sample_sep_pos) > 0:
                                 keep_idxs.append(sample_idx)
                                 match_pos[sample_idx] = torch.min(sample_sep_pos)
                     else:
                         if not self.ignore_errors:
-                            raise ValueError(f"Multiple occurrences of {token} not supported")
+                            raise ValueError(
+                                f"Multiple occurrences of {token} not supported"
+                            )
                         else:
                             s = sample_matches.tolist()
                             dups = list(set([x for x in s if s.count(x) > 1]))
-                            x = "".join(self.tokenizer.convert_ids_to_tokens(inputs[dups[0]]))
+                            x = "".join(
+                                self.tokenizer.convert_ids_to_tokens(inputs[dups[0]])
+                            )
                             logger.error(f"Multiple occurrences of property {x}")
 
                 else:
@@ -249,7 +307,9 @@ class SinglePropertyCollator(BaseCollator):
                         # For each sample, find the first sep token that follows the property token
                         sample_sep_pos = match_positions[sample_matches == sample_idx]
                         rel_sep_pos = sample_sep_pos - matches[-1][sample_idx]
-                        match_pos[sample_idx] = sample_sep_pos[torch.where(rel_sep_pos > 0)[0][0]]
+                        match_pos[sample_idx] = sample_sep_pos[
+                            torch.where(rel_sep_pos > 0)[0][0]
+                        ]
                     match_pos = match_pos[keep_idxs]
 
                 match_positions = match_pos
@@ -258,15 +318,18 @@ class SinglePropertyCollator(BaseCollator):
         # Creating the mask and target_mapping tensors
         labels = inputs.clone()
         masked_indices = torch.full(labels.shape, 0, dtype=torch.bool, device=device)
-        target_mapping = torch.zeros((labels.size(0), labels.size(1), labels.size(1)), dtype=torch.float32,
-                                     device=device)
+        target_mapping = torch.zeros(
+            (labels.size(0), labels.size(1), labels.size(1)),
+            dtype=torch.float32,
+            device=device,
+        )
         if self.mask_token_order is None:
             # Mask *all* tokens
             start_mask = (matches[0] + 1).int()
             end_mask = matches[1].int()
 
             for i in range(masked_indices.shape[0]):
-                masked_indices[i, start_mask[i]:end_mask[i]] = 1
+                masked_indices[i, start_mask[i] : end_mask[i]] = 1
                 target_mapping[i] = torch.eye(labels.size(1), device=device)
         else:
             # Mask only tokens saved in tokens_to_mask
@@ -278,8 +341,12 @@ class SinglePropertyCollator(BaseCollator):
                 masked_indices[i, mask_tokens] = 1
                 target_mapping[i] = torch.eye(labels.size(1), device=device)
 
-        inputs, masked_indices, non_func_mask, labels = self.mask(inputs, masked_indices, labels, device=device)
-        perm_mask = get_permutation_order(labels, masked_indices, non_func_mask, device=device)
+        inputs, masked_indices, non_func_mask, labels = self.mask(
+            inputs, masked_indices, labels, device=device
+        )
+        perm_mask = get_permutation_order(
+            labels, masked_indices, non_func_mask, device=device
+        )
 
         return inputs, perm_mask, target_mapping, labels
 
@@ -289,9 +356,15 @@ class PropertyCollator(SinglePropertyCollator):
     """Collator class to parse samples for property prediction task.
     NOTE: This can handle multiple properties
     """
-    def __init__(self, tokenizer: PreTrainedTokenizer, property_tokens: Iterable[str],
-                 num_tokens_to_mask: Optional[Iterable[int]] = None,
-                 mask_token_order: Optional[Iterable[List[int]]] = None, ignore_errors: bool = False):
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        property_tokens: Iterable[str],
+        num_tokens_to_mask: Optional[Iterable[int]] = None,
+        mask_token_order: Optional[Iterable[List[int]]] = None,
+        ignore_errors: bool = False,
+    ):
         """
         Args:
             tokenizer (PreTrainedTokenizer): Tokenizer used for splitting.
@@ -324,10 +397,18 @@ class PropertyCollator(SinglePropertyCollator):
         self.num_tokens_to_mask = num_tokens_to_mask
 
         collators = []
-        for token, num_to_mask, order in zip(property_tokens, num_tokens_to_mask, mask_token_order):
+        for token, num_to_mask, order in zip(
+            property_tokens, num_tokens_to_mask, mask_token_order
+        ):
             collators.append(
-                SinglePropertyCollator(tokenizer=tokenizer, property_token=token, num_tokens_to_mask=num_to_mask,
-                                       mask_token_order=order, ignore_errors=ignore_errors))
+                SinglePropertyCollator(
+                    tokenizer=tokenizer,
+                    property_token=token,
+                    num_tokens_to_mask=num_to_mask,
+                    mask_token_order=order,
+                    ignore_errors=ignore_errors,
+                )
+            )
         self.collators = collators
 
     def mask_tokens(
@@ -350,7 +431,9 @@ class PropertyCollator(SinglePropertyCollator):
         labels = torch.ones(*inputs.shape, device=device).long() * -100
 
         for idx, collator in enumerate(self.collators):
-            inputs, _perm_mask, target_mapping, _labels = collator.mask_tokens(inputs, device=device)
+            inputs, _perm_mask, target_mapping, _labels = collator.mask_tokens(
+                inputs, device=device
+            )
             # perm_mask = torch.logical_or(perm_mask, _perm_mask).float()
             perm_mask = (perm_mask.bool() | _perm_mask.bool()).float()
             labels = torch.max(labels, _labels)
@@ -363,10 +446,17 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
     NOTE: Can only handle a single property. Intended to use for evaluation to
     assess the effect of changing one property.
     """
-    def __init__(self, tokenizer: PreTrainedTokenizer, property_token: str, conditioning_range: Iterable[Union[float,
-                                                                                                               int]],
-                 plm_probability: float = 1 / 6, max_span_length: int = 5, entity_to_mask: Optional[int] = None,
-                 entity_separator_token: Optional[str] = None):
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        property_token: str,
+        conditioning_range: Iterable[Union[float, int]],
+        plm_probability: float = 1 / 6,
+        max_span_length: int = 5,
+        entity_to_mask: Optional[int] = None,
+        entity_separator_token: Optional[str] = None,
+    ):
         """
         Args:
             tokenizer (PreTrainedTokenizer): Tokenizer used for splitting.
@@ -401,16 +491,20 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
             map(
                 lambda x: property_token + str(x) + tokenizer.expression_separator,
                 conditioning_range,
-            ))
+            )
+        )
         self.num_primed = len(self.conditioning_range)
 
         self.entity_to_mask = entity_to_mask
         self.entity_separator_token = entity_separator_token
         if entity_separator_token:
-            self.entity_separator_idx = self.tokenizer.convert_tokens_to_ids(entity_separator_token)
+            self.entity_separator_idx = self.tokenizer.convert_tokens_to_ids(
+                entity_separator_token
+            )
 
-    def __call__(self, examples: List[Union[List[int], torch.Tensor, Dict[str,
-                                                                          torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+    def __call__(
+        self, examples: List[Union[List[int], torch.Tensor, Dict[str, torch.Tensor]]]
+    ) -> Dict[str, torch.Tensor]:
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
 
@@ -423,11 +517,12 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
             "target_mapping": target_mapping,
             "labels": labels,
             "real_property": true_prop,
-            "attention_mask": attention_mask
+            "attention_mask": attention_mask,
         }
 
     def mask_tokens(
-            self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, inputs: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         - Masks never on the property but only after the last separator
         - Creates self.num_primed instances per sample, each with a
@@ -445,13 +540,17 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
             )
 
         # Find matches for property token
-        a, property_token_pos = (inputs == self.property_token_idx).nonzero(as_tuple=True)
+        a, property_token_pos = (inputs == self.property_token_idx).nonzero(
+            as_tuple=True
+        )
         primer_start_pos = property_token_pos.tolist()
         if len(a) != inputs.size(0) or list(range(inputs.size(0))) != a.tolist():
             raise ValueError(f"Found samples with multiple or no token counts {inputs}")
 
         # Find matches for separator token
-        b, separator_token_pos = (inputs == self.separator_token_idx).nonzero(as_tuple=True)
+        b, separator_token_pos = (inputs == self.separator_token_idx).nonzero(
+            as_tuple=True
+        )
 
         # Find the next separator after the property token
         primer_end_pos = []
@@ -463,17 +562,27 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
         labels = inputs.clone()
 
         # Determine which token (positions) are considered for masking
-        first_ent_pos, last_ent_pos = self.find_entity_indices(inputs, self.entity_to_mask)
+        first_ent_pos, last_ent_pos = self.find_entity_indices(
+            inputs, self.entity_to_mask
+        )
 
         # Start masking from the beginning of the SMILES/SELFIES
-        masked_indices, target_mapping = get_mask(labels, max_span_length=self.max_span_length,
-                                                  plm_probability=self.plm_probability, mask_start_idxs=first_ent_pos,
-                                                  mask_end_idxs=last_ent_pos)
+        masked_indices, target_mapping = get_mask(
+            labels,
+            max_span_length=self.max_span_length,
+            plm_probability=self.plm_probability,
+            mask_start_idxs=first_ent_pos,
+            mask_end_idxs=last_ent_pos,
+        )
 
-        inputs, masked_indices, non_func_mask, labels = self.mask(inputs, masked_indices, labels)
+        inputs, masked_indices, non_func_mask, labels = self.mask(
+            inputs, masked_indices, labels
+        )
 
         perm_mask = get_permutation_order(labels, masked_indices, non_func_mask)
-        primed_inputs, real_property = self.prime_inputs(inputs, primer_start_pos, primer_end_pos)
+        primed_inputs, real_property = self.prime_inputs(
+            inputs, primer_start_pos, primer_end_pos
+        )
 
         # Repeat all remaining output variables for conditioning
         perm_mask = perm_mask.repeat_interleave(self.num_primed, dim=0)
@@ -481,8 +590,9 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
         labels = labels.repeat_interleave(self.num_primed, dim=0)
         return primed_inputs.long(), perm_mask, target_mapping, labels, real_property
 
-    def prime_inputs(self, inputs: torch.Tensor, property_token_pos: List,
-                     separator_token_pos: List) -> Tuple[torch.Tensor, torch.Tensor]:
+    def prime_inputs(
+        self, inputs: torch.Tensor, property_token_pos: List, separator_token_pos: List
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Replicates all sample of a batch k times with k different primers for the
         property specified in constructor and the k different primers specified in
         conditioning_range.
@@ -507,13 +617,18 @@ class ConditionalGenerationEvaluationCollator(BaseCollator):
         for i in range(inputs.shape[0]):
             # Maintain and return true property
             real_property[i] = self.tokenizer.floating_tokens_to_float(
-                self.tokenizer.decode(inputs[i, property_token_pos[i] + 1:separator_token_pos[i]]).split(" "))
+                self.tokenizer.decode(
+                    inputs[i, property_token_pos[i] + 1 : separator_token_pos[i]]
+                ).split(" ")
+            )
 
             for pidx, primer in enumerate(self.conditioning_range):
                 primed_inputs[(i * self.num_primed) + pidx, :] = inputs[i]
                 keep = self.tokenizer(primer)["input_ids"][2:-2]
-                primed_inputs[(i * self.num_primed) + pidx,
-                              property_token_pos[i] + 1:property_token_pos[i] + 1 + len(keep), ] = torch.Tensor(keep)
+                primed_inputs[
+                    (i * self.num_primed) + pidx,
+                    property_token_pos[i] + 1 : property_token_pos[i] + 1 + len(keep),
+                ] = torch.Tensor(keep)
 
         return primed_inputs, real_property
 
@@ -525,9 +640,17 @@ class ConditionalGenerationTrainCollator(BaseCollator):
     the properties with sampled values.
     NOTE: This collator can deal with multiple properties.
     """
-    def __init__(self, tokenizer: PreTrainedTokenizer, property_tokens: Iterable[str], plm_probability: float = 1 / 6,
-                 max_span_length: int = 5, do_sample: bool = False,
-                 property_value_ranges: Optional[Iterable[Iterable[float]]] = None, **kwargs):
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        property_tokens: Iterable[str],
+        plm_probability: float = 1 / 6,
+        max_span_length: int = 5,
+        do_sample: bool = False,
+        property_value_ranges: Optional[Iterable[Iterable[float]]] = None,
+        **kwargs,
+    ):
         """
         Args:
             tokenizer (PreTrainedTokenizer): Tokenizer used for splitting.
@@ -574,14 +697,16 @@ class ConditionalGenerationTrainCollator(BaseCollator):
             # Functions still need an argument (_), but it is ignored here. It is
             # needed to avoid the need of overwriting `sample_property` in child classes
             self.sampling_functions = [
-                lambda _, x=pr: float((x[0] - x[1]) * torch.rand(1) + x[1]) for pr in property_value_ranges
+                lambda _, x=pr: float((x[0] - x[1]) * torch.rand(1) + x[1])
+                for pr in property_value_ranges
             ]
 
             # For compatibility with related classes
             self.num_primed = 1
 
-    def __call__(self, examples: List[Union[List[int], torch.Tensor, Dict[str,
-                                                                          torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+    def __call__(
+        self, examples: List[Union[List[int], torch.Tensor, Dict[str, torch.Tensor]]]
+    ) -> Dict[str, torch.Tensor]:
         if isinstance(examples[0], (dict, BatchEncoding)):
             examples = [e["input_ids"] for e in examples]
         batch = self.finalize(self._tensorize_batch(examples))
@@ -596,11 +721,12 @@ class ConditionalGenerationTrainCollator(BaseCollator):
             "labels": labels,
             "real_property": true_prop,
             "sample_weights": sample_weights,
-            "attention_mask": attention_mask
+            "attention_mask": attention_mask,
         }
 
     def mask_tokens(
-            self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, inputs: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Token masking function. Masks never on the property but only after the
         last separator, i.e., on the molecule.
 
@@ -631,32 +757,44 @@ class ConditionalGenerationTrainCollator(BaseCollator):
             )
 
         # Find matches for separator
-        separator_matches, separator_token_pos = (inputs == self.separator_token_idx).nonzero(as_tuple=True)
+        separator_matches, separator_token_pos = (
+            inputs == self.separator_token_idx
+        ).nonzero(as_tuple=True)
         unique_separator_matches = torch.unique(separator_matches)
 
-        assert torch.equal(unique_separator_matches,
-                           torch.arange(inputs.size(0))), f"Found samples without separator {unique_separator_matches}"
+        assert torch.equal(
+            unique_separator_matches, torch.arange(inputs.size(0))
+        ), f"Found samples without separator {unique_separator_matches}"
 
         # Retrieve index of last occurrence of separator and add one to get
         # first index which could be masked
         last_sep_pos = [
-            int(max(separator_token_pos[torch.where(separator_matches == s)])) + 1 for s in unique_separator_matches
+            int(max(separator_token_pos[torch.where(separator_matches == s)])) + 1
+            for s in unique_separator_matches
         ]
 
         # Creating the mask and target_mapping tensors
         labels = inputs.clone()
 
         # Start masking from the beginning of the SMILES/SELFIES
-        masked_indices, target_mapping = get_mask(labels, max_span_length=self.max_span_length,
-                                                  plm_probability=self.plm_probability, mask_start_idxs=last_sep_pos)
+        masked_indices, target_mapping = get_mask(
+            labels,
+            max_span_length=self.max_span_length,
+            plm_probability=self.plm_probability,
+            mask_start_idxs=last_sep_pos,
+        )
 
-        inputs, masked_indices, non_func_mask, labels = self.mask(inputs, masked_indices, labels)
+        inputs, masked_indices, non_func_mask, labels = self.mask(
+            inputs, masked_indices, labels
+        )
 
         perm_mask = get_permutation_order(labels, masked_indices, non_func_mask)
 
         return inputs, perm_mask, target_mapping, labels
 
-    def sample_property(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample_property(
+        self, inputs: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Samples a primer for each property, fills the input with the new primer and
         saves the real property values.
@@ -678,13 +816,17 @@ class ConditionalGenerationTrainCollator(BaseCollator):
         """
 
         # Find matches for separator
-        separator_matches, separator_token_pos = (inputs == self.separator_token_idx).nonzero(as_tuple=True)
+        separator_matches, separator_token_pos = (
+            inputs == self.separator_token_idx
+        ).nonzero(as_tuple=True)
 
         # Replace the true properties if applicable
         real_property = torch.zeros(inputs.shape[0], self.num_props)
         sample_weights = torch.ones(inputs.shape[0], self.num_props)
         # For each property
-        for pidx, (prop_token, prop_token_idx) in enumerate(zip(self.property_tokens, self.property_token_idxs)):
+        for pidx, (prop_token, prop_token_idx) in enumerate(
+            zip(self.property_tokens, self.property_token_idxs)
+        ):
             self.pidx = pidx
 
             # Set property values/ranges
@@ -694,7 +836,9 @@ class ConditionalGenerationTrainCollator(BaseCollator):
                 property_range = abs(prop_values[1] - prop_values[0])
 
             # Find matches for property tokens
-            property_matches, property_token_pos = (inputs == prop_token_idx).nonzero(as_tuple=True)
+            property_matches, property_token_pos = (inputs == prop_token_idx).nonzero(
+                as_tuple=True
+            )
             if len(set(property_matches.tolist())) < inputs.size(0):
                 logger.debug(f"Found samples without property token {prop_token}")
             elif len(property_matches.tolist()) > len(set(property_matches.tolist())):
@@ -705,29 +849,43 @@ class ConditionalGenerationTrainCollator(BaseCollator):
                 # First, extract true property
 
                 # Find all separators in current sample, then find the next one
-                separator_idxs = separator_token_pos[torch.where(separator_matches == prow)]
+                separator_idxs = separator_token_pos[
+                    torch.where(separator_matches == prow)
+                ]
                 sep_idx = min([x for x in separator_idxs if x > pcol])
 
                 realprop = self.tokenizer.floating_tokens_to_float(
-                    self.tokenizer.decode(inputs[prow, pcol + 1:sep_idx]).split(" "))
+                    self.tokenizer.decode(inputs[prow, pcol + 1 : sep_idx]).split(" ")
+                )
                 real_property[prow, pidx] = realprop
                 if self.do_sample:
                     # Sample property and fill it in
                     num_digits = sep_idx - (pcol + 1)
                     sampled_prop = sample(realprop)  # ignored in the base class
-                    sampled_prop_str = (prop_token + str(sampled_prop)[:num_digits] +
-                                        self.tokenizer.expression_separator)
-                    new_tokens = torch.Tensor(self.tokenizer(sampled_prop_str)["input_ids"])
-                    new_tokens = new_tokens[2:torch.where(new_tokens == self.separator_token_idx)[0]]
-                    inputs[prow, pcol + 1:sep_idx] = new_tokens
+                    sampled_prop_str = (
+                        prop_token
+                        + str(sampled_prop)[:num_digits]
+                        + self.tokenizer.expression_separator
+                    )
+                    new_tokens = torch.Tensor(
+                        self.tokenizer(sampled_prop_str)["input_ids"]
+                    )
+                    new_tokens = new_tokens[
+                        2 : torch.where(new_tokens == self.separator_token_idx)[0]
+                    ]
+                    inputs[prow, pcol + 1 : sep_idx] = new_tokens
                     # Compute a sample weight between -1 and 1. 1 means sampled was very
                     # similar to real property, -1 means it was very distinct. Can
                     # be used to scale the loss of each sample.
-                    sample_weights[prow, pidx] = self.get_sample_weight(realprop, sampled_prop, property_range)
+                    sample_weights[prow, pidx] = self.get_sample_weight(
+                        realprop, sampled_prop, property_range
+                    )
 
         return inputs, real_property, sample_weights.mean(axis=-1)
 
-    def get_sample_weight(self, real_prop: float, sampled_prop: float, prop_range: float) -> float:
+    def get_sample_weight(
+        self, real_prop: float, sampled_prop: float, prop_range: float
+    ) -> float:
         """Function to generate the sample weight for the loss function. Based on the
         assumption that if a primer close to the real property was sampled, sample weight
         is high and if a very distant primer was sampled, the sample weight is negative,
@@ -749,10 +907,19 @@ class MultiEntityCGTrainCollator(ConditionalGenerationTrainCollator):
     """
     A training collator the conditional-generation task that can handle multiple entities
     """
-    def __init__(self, tokenizer: PreTrainedTokenizer, property_tokens: Iterable[str], plm_probability: float = 1 / 6,
-                 max_span_length: int = 5, do_sample: bool = False,
-                 property_value_ranges: Optional[Iterable[Iterable[float]]] = None, entity_separator_token: str = ".",
-                 mask_entity_separator: bool = False, entity_to_mask: int = -1):
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        property_tokens: Iterable[str],
+        plm_probability: float = 1 / 6,
+        max_span_length: int = 5,
+        do_sample: bool = False,
+        property_value_ranges: Optional[Iterable[Iterable[float]]] = None,
+        entity_separator_token: str = ".",
+        mask_entity_separator: bool = False,
+        entity_to_mask: int = -1,
+    ):
         """
         For arguments before `entity_separator_token`, check out the parent class.
 
@@ -770,12 +937,19 @@ class MultiEntityCGTrainCollator(ConditionalGenerationTrainCollator):
                 this argument will not have any effect. Defaults to -1.
         """
         # Set up base collator
-        super().__init__(tokenizer=tokenizer, property_tokens=property_tokens, plm_probability=plm_probability,
-                         max_span_length=max_span_length, do_sample=do_sample,
-                         property_value_ranges=property_value_ranges)
+        super().__init__(
+            tokenizer=tokenizer,
+            property_tokens=property_tokens,
+            plm_probability=plm_probability,
+            max_span_length=max_span_length,
+            do_sample=do_sample,
+            property_value_ranges=property_value_ranges,
+        )
 
         self.entity_separator_token = entity_separator_token
-        self.entity_separator_idx = self.tokenizer.convert_tokens_to_ids(entity_separator_token)
+        self.entity_separator_idx = self.tokenizer.convert_tokens_to_ids(
+            entity_separator_token
+        )
         self.mask_entity_separator = mask_entity_separator
         self.entity_to_mask = entity_to_mask
 
@@ -790,8 +964,12 @@ class MultiEntityCGTrainCollator(ConditionalGenerationTrainCollator):
         """
         Sets the function used to mask the tokens
         """
+
         def mask_tokens(
-            inputs: torch.Tensor, ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+            inputs: torch.Tensor,
+        ) -> Tuple[
+            torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+        ]:
             """
             Token masking function. Masks never on the property but only after the
             last separator, i.e., on the molecule. Will mask only one on entity per
@@ -813,15 +991,26 @@ class MultiEntityCGTrainCollator(ConditionalGenerationTrainCollator):
             # Creating the mask and target_mapping tensors
             labels = inputs.clone()
 
-            first_ent_pos, last_ent_pos = self.find_entity_indices(inputs, self.entity_to_mask)
+            first_ent_pos, last_ent_pos = self.find_entity_indices(
+                inputs, self.entity_to_mask
+            )
 
             # Start masking from the beginning of the SMILES/SELFIES
-            masked_indices, target_mapping = get_mask(labels, max_span_length=self.max_span_length,
-                                                      plm_probability=self.plm_probability,
-                                                      mask_start_idxs=first_ent_pos, mask_end_idxs=last_ent_pos)
+            masked_indices, target_mapping = get_mask(
+                labels,
+                max_span_length=self.max_span_length,
+                plm_probability=self.plm_probability,
+                mask_start_idxs=first_ent_pos,
+                mask_end_idxs=last_ent_pos,
+            )
 
-            inputs, masked_indices, non_func_mask, labels = self.mask(inputs, masked_indices, labels)
+            inputs, masked_indices, non_func_mask, labels = self.mask(
+                inputs, masked_indices, labels
+            )
+            logger.debug(f"Multientity CG inputs {inputs[0,:]}")
+
             perm_mask = get_permutation_order(labels, masked_indices, non_func_mask)
+
             return inputs, perm_mask, target_mapping, labels
 
         return mask_tokens
@@ -830,6 +1019,9 @@ class MultiEntityCGTrainCollator(ConditionalGenerationTrainCollator):
 TRAIN_COLLATORS = {
     "property": PropertyCollator,
     "vanilla_cg": ConditionalGenerationTrainCollator,
-    "multientity_cg": MultiEntityCGTrainCollator
+    "multientity_cg": MultiEntityCGTrainCollator,
 }
-EVAL_COLLATORS = {"property": PropertyCollator, "conditional_generation": ConditionalGenerationEvaluationCollator}
+EVAL_COLLATORS = {
+    "property": PropertyCollator,
+    "conditional_generation": ConditionalGenerationEvaluationCollator,
+}
