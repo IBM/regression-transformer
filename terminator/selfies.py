@@ -4,10 +4,13 @@ Taken from: https://github.com/aspuru-guzik-group/selfies
 """
 
 from collections import OrderedDict
-from typing import Dict, Iterable, List, Optional, Tuple, Union
-
 from itertools import product
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
+
+ATOM_TYPE = 1
+BRANCH_TYPE = 2
+RING_TYPE = 3
+
 
 default_bond_constraints = {
     'H': 1,
@@ -439,6 +442,509 @@ def parse_atom_symbol(atom_symbol: str) -> Tuple[str, int, int]:
     return atom_symbol[atom_start:atom_end], h_count, charge
 
 
+def kekulize_parser(
+    smiles_gen: Iterable[Tuple[str, str, int]]
+) -> Iterable[Tuple[str, str, int]]:
+    """Kekulizes a SMILES in the form of an iterable.
+    This method intercepts the output of ``encoder._parse_smiles``, and
+    acts as filter that kekulizes the SMILES. The motivation for having
+    this setup is that string parsing and concatenation is minimized,
+    as the parsing is already done by ``_parse_smiles``.
+    Reference: https://depth-first.com/articles/2020/02/10/a-comprehensive
+               -treatment-of-aromaticity-in-the-smiles-language/
+    :param smiles_gen: an iterator returned by ``encoder._parse_smiles``.
+    :return: an iterator representing the kekulized SMILES, in the same
+        format as that returned by ``encoder._parse_smiles``.
+    """
+
+    # save to list, so the iterator can be used across multiple functions
+    # change elements from tuple -> list to allow in-place modifications
+    smiles_symbols = list(map(list, smiles_gen))
+
+    mol_graph = MolecularGraph(smiles_symbols)
+
+    rings = {}
+    _build_molecular_graph(mol_graph, smiles_symbols, rings)
+
+    if mol_graph.aro_indices:
+        _kekulize(mol_graph)
+
+    for x in mol_graph.smiles_symbols:  # return as iterator
+        yield tuple(x)
+
+
+def _build_molecular_graph(
+    graph,
+    smiles_symbols: List[List[Union[str, int]]],
+    rings: Dict[int, Tuple[int, int]],
+    prev_idx: int = -1,
+    curr_idx: int = -1,
+) -> int:
+    """From the iterator returned by ``encoder._parse_smiles``, builds
+    a graph representation of the molecule.
+    This is done by iterating through ``smiles_symbols``, and then adding bonds
+    to the molecular graph. Note that ``smiles_symbols`` is mutated in this
+    method, for convenience.
+    :param graph: the MolecularGraph to be added to.
+    :param smiles_symbols: a list created from the iterator returned
+        by ``encoder._parse_smiles``.
+    :param rings: an, initially, empty dictionary used to keep track of
+        rings to be made.
+    :param prev_idx:
+    :param curr_idx:
+    :return: the last index of ``smiles_symbols`` that was processed.
+    """
+
+    while curr_idx + 1 < len(smiles_symbols):
+
+        curr_idx += 1
+        _, symbol, symbol_type = smiles_symbols[curr_idx]
+
+        if symbol_type == ATOM_TYPE:
+            if prev_idx >= 0:
+                graph.add_bond(prev_idx, curr_idx, curr_idx)
+            prev_idx = curr_idx
+
+        elif symbol_type == BRANCH_TYPE:
+            if symbol == '(':
+                curr_idx = _build_molecular_graph(
+                    graph, smiles_symbols, rings, prev_idx, curr_idx
+                )
+            else:
+                break
+
+        else:
+            if symbol in rings:
+                left_idx, left_bond_idx = rings.pop(symbol)
+                right_idx, right_bond_idx = prev_idx, curr_idx
+
+                # we mutate one bond index to be '', so that we
+                # can faithfully represent the bond to be localized at
+                # one index. For example, C=1CCCC=1 --> C1CCCC=1.
+
+                if smiles_symbols[left_bond_idx][0] != '':
+                    bond_idx = left_bond_idx
+                    smiles_symbols[right_bond_idx][0] = ''
+                else:
+                    bond_idx = right_bond_idx
+                    smiles_symbols[left_bond_idx][0] = ''
+
+                graph.add_bond(left_idx, right_idx, bond_idx)
+            else:
+                rings[symbol] = (prev_idx, curr_idx)
+
+    return curr_idx
+
+
+def _kekulize(mol_graph) -> None:
+    """Kekulizes the molecular graph.
+    :param mol_graph: a molecular graph to be kekulized.
+    :return: None.
+    """
+
+    mol_graph.prune_to_pi_subgraph()
+
+    visited = set()
+    for i in mol_graph.get_nodes_by_num_edges():
+        success = mol_graph.dfs_assign_bonds(i, visited, set(), set())
+        if not success:
+            raise ValueError("kekulization algorithm failed")
+
+    mol_graph.write_to_smiles_symbols()
+
+
+# Aromatic Helper Methods and Classes
+
+# key = aromatic SMILES element, value = number of valence electrons
+# Note: wild card '*' not supported currently
+_aromatic_valences = {
+    'b': 3,
+    'al': 3,
+    'c': 4,
+    'si': 4,
+    'n': 5,
+    'p': 5,
+    'as': 5,
+    'o': 6,
+    's': 6,
+    'se': 6,
+    'te': 6,
+}
+
+
+def _capitalize(atom_symbol: str) -> str:
+    """Capitalizes the element portion of an aromatic SMILES atom symbol,
+    converting it into a standard SMILES atom symbol.
+    :param atom_symbol: an aromatic SMILES atom symbol.
+    :return: the capitalized ``atom_symbol``.
+    """
+
+    s, _ = find_element(atom_symbol)
+    return atom_symbol[:s] + atom_symbol[s].upper() + atom_symbol[s + 1 :]
+
+
+def _is_aromatic(atom_symbol: str) -> bool:
+    """Checks whether a SMILES atom symbol is an aromatic SMILES atom symbol.
+    An aromatic SMILES atom symbol is indicated by an element substring
+    that is not capitalized.
+    :param atom_symbol: a SMILES atom symbol.
+    :return: True, if ``atom_symbol`` is an aromatic atom symbol,
+        and False otherwise.
+    """
+
+    s, e = find_element(atom_symbol)
+
+    if e == len(atom_symbol):  # optimization to prevent string copying
+        element = atom_symbol
+    else:
+        element = atom_symbol[s:e]
+
+    if element[0].isupper():  # check if element is capitalized
+        return False
+
+    if element not in _aromatic_valences:
+        raise ValueError("unrecognized aromatic symbol '{}'".format(atom_symbol))
+    return True
+
+
+def _in_pi_subgraph(atom_symbol: str, bonds: Tuple[str]) -> bool:
+    """Checks whether a SMILES atom symbol should be a node in the pi
+    subgraph, based on its bonds.
+    More specifically, an atom should be a node in the pi subgraph if it has
+    an unpaired valence electron, and thus, is able to make a double bond.
+    Reference: https://depth-first.com/articles/2020/02/10/a-comprehensive
+               -treatment-of-aromaticity-in-the-smiles-language/
+    :param atom_symbol: a SMILES atom symbol representing an atom.
+    :param bonds: the bonds connected to ``atom_symbol``.
+    :return: True if ``atom_symbol`` should be included in the pi subgraph,
+        and False otherwise.
+    """
+
+    atom, h_count, charge = parse_atom_symbol(atom_symbol)
+
+    used_electrons = 0
+    for b in bonds:
+        used_electrons += get_num_from_bond(b)
+
+    # e.g. c1ccccc1
+    # this also covers the neutral carbon radical case (e.g. C1=[C]NC=C1),
+    # which is treated equivalently to a 1-H carbon (e.g. C1=[CH]NC=C1)
+    if (
+        (atom == 'c')
+        and (h_count == charge == 0)
+        and (len(bonds) == 2)
+        and ('#' not in bonds)
+    ):
+
+        h_count += 1  # implied bonded hydrogen
+
+    if h_count > 1:
+        raise ValueError("unrecognized aromatic symbol '{}'".format(atom_symbol))
+
+    elif h_count == 1:  # e.g. [nH]
+        used_electrons += 1
+
+    valence = _aromatic_valences[atom] - charge
+    free_electrons = valence - used_electrons
+    return free_electrons % 2 != 0
+
+
+class MolecularGraph:
+    """A molecular graph.
+    This molecular graph operates based on the ``smiles_symbols`` data
+    structure. Indices from this list represent nodes or edges, depending
+    on whether they point to a SMILES atom(s) or bond.
+    :ivar smiles_symbols: the list created from the iterator returned by
+        ``encoder._parse_smiles``. Serves as the base data structure
+        of this class, as everything is communicated through indices
+        referring to elements of this list.
+    :ivar graph: the key is an index of the atom(s) from ``smiles_symbols``.
+        The value is a list of Bond objects representing the connected
+        bonds. Represents the actual molecular graph.
+    :ivar aro_indices: a set of indices of atom(s) from ``smiles_symbols``
+        that are aromatic in the molecular graph.
+    """
+
+    def __init__(self, smiles_symbols: List[List[Union[str, int]]]):
+        self.smiles_symbols = smiles_symbols
+        self.graph = {}
+        self.aro_indices = set()
+
+    def get_atom_symbol(self, idx: int) -> str:
+        """Getter that returns the SMILES symbol representing an atom
+        at a specified index.
+        :param idx: an index in ``smiles_symbols``.
+        :return: the SMILES symbol representing an atom at index
+            ``idx`` in ``smiles_symbols``.
+        """
+
+        return self.smiles_symbols[idx][1]
+
+    def get_bond_symbol(self, idx: int) -> str:
+        """Getter that returns the SMILES symbol representing a bond at
+        a specified index.
+        :param idx: an index in ``smiles_symbols``.
+        :return: the SMILES symbol representing a bond at index
+            ``idx`` in ``smiles_symbols``.
+        """
+
+        return self.smiles_symbols[idx][0]
+
+    def get_nodes_by_num_edges(self) -> List[int]:
+        """Returns all nodes (or indices) stored in this molecular graph
+        in a semi-sorted order by number of edges.
+        This is to optimize the speed of ``dfs_assign_bonds``; starting
+        with nodes that have fewer edges will improve computational time
+        as there are fewer bond configurations to explore. Instead of fully
+        sorting the returned list, a compromise is made, and nodes with exactly
+        one edge are added to the list's beginning.
+        :return: a list of the nodes (or indices) of this molecular graph,
+            semi-sorted by number of edges.
+        """
+
+        ends = []  # nodes with exactly 1 edge
+        middles = []  # nodes with 2+ edges
+
+        for idx, edges in self.graph.items():
+            if len(edges) > 1:
+                middles.append(idx)
+            else:
+                ends.append(idx)
+
+        ends.extend(middles)
+        return ends
+
+    def set_atom_symbol(self, atom_symbol: str, idx: int) -> None:
+        """Setter that updates the SMILES symbol representing an atom(s) at
+        a specified index.
+        :param atom_symbol: the new value of the atom symbol at ``idx``.
+        :param idx: an index in ``smiles_symbols``.
+        :return: None.
+        """
+
+        self.smiles_symbols[idx][1] = atom_symbol
+
+    def set_bond_symbol(self, bond_symbol: str, idx: int) -> None:
+        """Setter that updates the SMILES symbol representing a bond at
+        a specified index.
+        :param bond_symbol: the new value of the bond symbol at ``idx``.
+        :param idx: an index in ``smiles_symbols``.
+        :return: None.
+        """
+
+        self.smiles_symbols[idx][0] = bond_symbol
+
+    def add_bond(self, idx_a: int, idx_b: int, bond_idx: int) -> None:
+        """Adds a bond (or edge) to this molecular graph between atoms
+        (or nodes) at two specified indices.
+        :param idx_a: the index of one atom (or node) of this bond.
+        :param idx_b:the index of one atom (or node) of this bond.
+        :param bond_idx: the index of this bond.
+        :return: None.
+        """
+
+        atom_a = self.get_atom_symbol(idx_a)
+        atom_b = self.get_atom_symbol(idx_b)
+        atom_a_aro = (idx_a in self.aro_indices) or _is_aromatic(atom_a)
+        atom_b_aro = (idx_b in self.aro_indices) or _is_aromatic(atom_b)
+        bond_symbol = self.get_bond_symbol(bond_idx)
+
+        if atom_a_aro:
+            self.aro_indices.add(idx_a)
+
+        if atom_b_aro:
+            self.aro_indices.add(idx_b)
+
+        if bond_symbol == ':':
+            self.aro_indices.add(idx_a)
+            self.aro_indices.add(idx_b)
+
+            # Note: ':' bonds are edited here to ''
+            self.set_bond_symbol('', bond_idx)
+            bond_symbol = ''
+
+        edge = Bond(idx_a, idx_b, bond_symbol, bond_idx)
+
+        self.graph.setdefault(idx_a, []).append(edge)
+        self.graph.setdefault(idx_b, []).append(edge)
+
+    def prune_to_pi_subgraph(self) -> None:
+        """Removes nodes and edges from this molecular graph such that
+        it becomes the pi subgraph.
+        The remaining graph will only contain aromatic atoms (or nodes)
+        that belong in the pi-subgraph, and the bonds that are aromatic
+        and between such atoms.
+        :return: None.
+        """
+
+        # remove non-aromatic nodes
+        non_aromatic = self.graph.keys() - self.aro_indices
+        for i in non_aromatic:
+            self.graph.pop(i)
+
+        # remove non-pi subgraph nodes
+        for i in self.aro_indices:
+
+            atom = self.get_atom_symbol(i)
+            bonds = tuple(edge.bond_symbol for edge in self.graph[i])
+
+            if not _in_pi_subgraph(atom, bonds):
+                self.graph.pop(i)
+
+        # remove irrelevant edges
+        for idx, edges in self.graph.items():
+
+            keep = list(
+                filter(
+                    lambda e: (e.idx_a in self.graph)
+                    and (e.idx_b in self.graph)
+                    and (e.bond_symbol == ''),
+                    edges,
+                )
+            )
+            self.graph[idx] = keep
+
+    def dfs_assign_bonds(
+        self, idx: int, visited: Set[int], matched_nodes: Set[int], matched_edges
+    ) -> bool:
+        """After calling ``prune_to_pi_subgraph``, this method assigns
+        double bonds between pairs of nodes such that every node is
+        paired or matched.
+        This is done recursively in a depth-first search fashion.
+        :param idx: the index of the current atom (or node).
+        :param visited: a set of the indices of nodes that have been visited.
+        :param matched_nodes: a set of the indices of nodes that have been
+            matched, i.e., assigned a double bond.
+        :param matched_edges: a set of the bonds that have been matched.
+        :return: True, if a valid bond assignment was found; False otherwise.
+        """
+
+        if idx in visited:
+            return True
+
+        edges = self.graph[idx]
+
+        if idx in matched_nodes:
+
+            # recursively try to match adjacent nodes. If the matching
+            # fails, then we must backtrack.
+            visited_save = visited.copy()
+
+            visited.add(idx)
+            for e in edges:
+                adj = e.other_end(idx)
+                if not self.dfs_assign_bonds(
+                    adj, visited, matched_nodes, matched_edges
+                ):
+                    visited &= visited_save
+                    return False
+            return True
+
+        else:
+
+            # list of candidate edges that can become a double bond
+            candidates = list(
+                filter(lambda i: i.other_end(idx) not in matched_nodes, edges)
+            )
+
+            if not candidates:
+                return False  # idx is unmatched, but all adj nodes are matched
+
+            matched_edges_save = matched_edges.copy()
+
+            for e in candidates:
+
+                # match nodes connected by c
+                matched_nodes.add(e.idx_a)
+                matched_nodes.add(e.idx_b)
+                matched_edges.add(e)
+
+                success = self.dfs_assign_bonds(
+                    idx, visited, matched_nodes, matched_edges
+                )
+
+                if success:
+                    e.bond_symbol = '='
+                    return True
+                else:  # the matching failed, so we must backtrack
+
+                    for edge in matched_edges - matched_edges_save:
+                        edge.bond_symbol = ''
+                        matched_nodes.discard(edge.idx_a)
+                        matched_nodes.discard(edge.idx_b)
+
+                    matched_edges &= matched_edges_save
+
+            return False
+
+    def write_to_smiles_symbols(self):
+        """Updates and mutates ``self.smiles_symbols`` with the information
+         contained in ``self.graph``.
+        After kekulizing the molecular graph, this method is called to
+        merge the new information back into the original data structure.
+        :return: None.
+        """
+
+        # capitalize aromatic molecules
+        for idx in self.aro_indices:
+            self.set_atom_symbol(_capitalize(self.get_atom_symbol(idx)), idx)
+
+        # write bonds
+        for edge_list in self.graph.values():
+            for edge in edge_list:
+                bond_symbol = edge.bond_symbol
+                bond_idx = edge.bond_idx
+
+                self.set_bond_symbol(bond_symbol, bond_idx)
+
+                # branches record the next symbol as their bond, so we
+                # must update accordingly
+                if (bond_idx > 0) and (
+                    self.smiles_symbols[bond_idx - 1][2] == BRANCH_TYPE
+                ):
+                    self.set_bond_symbol(bond_symbol, bond_idx - 1)
+
+
+class Bond:
+    """Represents a bond or edge in MolecularGraph.
+    Recall that the following indices are with respect to ``smiles_symbols``
+    in MolecularGraph.
+    :ivar idx_a: the index of one atom or node of this bond.
+    :ivar idx_b: the index of one atom or node of this bond.
+    :ivar bond_symbol: the SMILES symbol representing this bond (e.g. '#').
+    :ivar bond_idx: the index of this bond or edge.
+    """
+
+    def __init__(self, idx_a, idx_b, bond_symbol, bond_idx):
+        self.idx_a = idx_a
+        self.idx_b = idx_b
+        self.bond_symbol = bond_symbol
+        self.bond_idx = bond_idx
+
+    def __eq__(self, other):
+        if isinstance(other, type(self)):
+            return (self.idx_a, self.idx_b) == (other.idx_a, other.idx_b)
+        return NotImplemented
+
+    def __hash__(self):
+        return hash((self.idx_a, self.idx_b))
+
+    def other_end(self, idx):
+        """Given an index representing one end of this bond, returns
+        the index representing the other end.
+        :param idx: an index of one atom or node of this bond.
+        :return: the index of the other atom or node of this bond, or
+            None if ``idx`` is an invalid input.
+        """
+
+        if idx == self.idx_a:
+            return self.idx_b
+        elif idx == self.idx_b:
+            return self.idx_a
+        return None
+
+
+############### Decoder ####################
 def decoder(
     selfies: str, print_error: bool = False, constraints: Optional[str] = None
 ) -> Optional[str]:
@@ -817,3 +1323,250 @@ def split_selfies(selfies: str) -> Iterable[str]:
         if selfies[left_idx : left_idx + 1] == ".":
             yield "."
             left_idx += 1
+
+
+###################### Encoder #######################
+
+
+def encoder(smiles: str, print_error: bool = False) -> Optional[str]:
+    """Translates a SMILES into a SELFIES.
+    The SMILES to SELFIES translation occurs independently of the SELFIES
+    alphabet and grammar. Thus, :func:`selfies.encoder` will work regardless of
+    the alphabet and grammar rules that :py:mod:`selfies` is operating on,
+    assuming the input is a valid SMILES. Additionally, :func:`selfies.encoder`
+    preserves the atom and branch order of the input SMILES; thus, one
+    could generate random SELFIES corresponding to the same molecule by
+    generating random SMILES, and then translating them.
+    However, encoding and then decoding a SMILES may not necessarily yield
+    the original SMILES. Reasons include:
+        1.  SMILES with aromatic symbols are automatically
+            Kekulized before being translated.
+        2.  SMILES that violate the bond constraints specified by
+            :mod:`selfies` will be successfully encoded by
+            :func:`selfies.encoder`, but then decoded into a new molecule
+            that satisfies the constraints.
+        3.  The exact ring numbering order is lost in :func:`selfies.encoder`,
+            and cannot be reconstructed by :func:`selfies.decoder`.
+    Finally, note that :func:`selfies.encoder` does **not** check if the input
+    SMILES is valid, and should not be expected to reject invalid inputs.
+    It is recommended to use RDKit to first verify that the SMILES are
+    valid.
+    :param smiles: the SMILES to be translated.
+    :param print_error: if True, error messages will be printed to console.
+        Defaults to False.
+    :return: the SELFIES translation of ``smiles``. If an error occurs,
+        and ``smiles`` cannot be translated, :code:`None` is returned instead.
+    :Example:
+    >>> import selfies
+    >>> selfies.encoder('C=CF')
+    '[C][=C][F]'
+    .. note:: Currently, :func:`selfies.encoder` does not support the
+        following types of SMILES:
+        *   SMILES using ring numbering across a dot-bond symbol
+            to specify bonds, e.g. ``C1.C2.C12`` (propane) or
+            ``c1cc([O-].[Na+])ccc1`` (sodium phenoxide).
+        *   SMILES with ring numbering between atoms that are over
+            ``16 ** 3 = 4096`` atoms apart.
+        *   SMILES using the wildcard symbol ``*``.
+        *   SMILES using chiral specifications other than ``@`` and ``@@``.
+    """
+
+    try:
+        if '*' in smiles:
+            raise ValueError("wildcard atom '*' not supported")
+
+        all_selfies = []  # process dot-separated fragments separately
+        for s in smiles.split("."):
+            all_selfies.append(_translate_smiles(s))
+        return '.'.join(all_selfies)
+
+    except ValueError as err:
+        if print_error:
+            print("Encoding error '{}': {}.".format(smiles, err))
+        return None
+
+
+def _translate_smiles(smiles: str) -> str:
+    """A helper for ``selfies.encoder``, which translates a SMILES into a
+    SELFIES (assuming the input SMILES contains no dots).
+    :param smiles: the SMILES to be translated.
+    :return: the SELFIES translation of SMILES.
+    """
+
+    smiles_gen = _parse_smiles(smiles)
+
+    char_set = set(smiles)
+    if any(c in char_set for c in ['c', 'n', 'o', 'p', 'a', 's']):
+        smiles_gen = kekulize_parser(smiles_gen)
+
+    # a simple mutable counter to track which atom was the i-th derived atom
+    derive_counter = [0]
+
+    # a dictionary to keep track of the rings to be made. If a ring with id
+    # X is connected to the i-th and j-th derived atoms (i < j) with bond
+    # symbol s, then after the i-th atom is derived, rings[X] = (s, i).
+    # As soon as the j-th atom is derived, rings[X] is removed from <rings>,
+    # and the ring is made.
+    rings = {}
+
+    selfies, _ = _translate_smiles_derive(smiles_gen, rings, derive_counter)
+
+    if rings:
+        raise ValueError(
+            "malformed ring numbering or ring numbering " "across a dot symbol"
+        )
+
+    return selfies
+
+
+def _parse_smiles(smiles: str) -> Iterable[Tuple[str, str, int]]:
+    """Parses a SMILES into its symbols.
+    A generator, which parses a SMILES string and returns its symbol(s)
+    one-by-one as a tuple of:
+        (1) the bond symbol connecting the current atom/ring/branch symbol
+            to the previous atom/ring/branch symbol (e.g. '=', '', '#')
+        (2) the atom/ring/branch symbol as a string (e.g. 'C', '12', '(')
+        (3) the type of the symbol in (2), represented as an integer that is
+            either ``ATOM_TYPE``, ``BRANCH_TYPE``, and ``RING_TYPE``.
+    As a precondition, we also assume ``smiles`` has no dots in it.
+    :param smiles: the SMILES to be parsed.
+    :return: an iterable of the symbol(s) of the SELFIES along with
+        their types.
+    """
+
+    i = 0
+
+    while 0 <= i < len(smiles):
+
+        bond = ''
+
+        if smiles[i] in {'-', '/', '\\', '=', '#', ":"}:
+            bond = smiles[i]
+            i += 1
+
+        if smiles[i].isalpha():  # organic subset elements
+            if smiles[i : i + 2] in ('Br', 'Cl'):  # two letter elements
+                symbol = smiles[i : i + 2]
+                symbol_type = ATOM_TYPE
+                i += 2
+            else:
+                symbol = smiles[i]  # one letter elements (e.g. C, N, ...)
+                symbol_type = ATOM_TYPE
+                i += 1
+
+        elif smiles[i] in ('(', ')'):  # open and closed branch brackets
+            bond = smiles[i + 1 : i + 2]
+            symbol = smiles[i]
+            symbol_type = BRANCH_TYPE
+            i += 1
+
+        elif smiles[i] == '[':  # atoms encased in brackets (e.g. [NH])
+            r_idx = smiles.find(']', i + 1)
+            symbol = smiles[i : r_idx + 1]
+            symbol_type = ATOM_TYPE
+            i = r_idx + 1
+
+            if r_idx == -1:
+                raise ValueError("malformed SMILES, missing ']'")
+
+            # quick chirality specification check
+            chiral_i = symbol.find('@')
+            if symbol[chiral_i + 1].isalpha() and symbol[chiral_i + 1] != 'H':
+                raise ValueError(
+                    "chiral specification '{}' not supported".format(symbol)
+                )
+
+        elif smiles[i].isdigit():  # one-digit ring number
+            symbol = smiles[i]
+            symbol_type = RING_TYPE
+            i += 1
+
+        elif smiles[i] == '%':  # two-digit ring number (e.g. %12)
+            symbol = smiles[i + 1 : i + 3]
+            symbol_type = RING_TYPE
+            i += 3
+
+        else:
+            raise ValueError("unrecognized symbol '{}'".format(smiles[i]))
+
+        yield bond, symbol, symbol_type
+
+
+def _translate_smiles_derive(
+    smiles_gen: Iterable[Tuple[str, str, int]],
+    rings: Dict[int, Tuple[str, int]],
+    counter: List[int],
+) -> Tuple[str, int]:
+    """Recursive helper for _translate_smiles.
+    Derives the SELFIES from a SMILES, and returns a tuple of (1) the
+    translated SELFIES and (2) the symbol length of the translated SELFIES.
+    :param smiles_gen: an iterable of the symbols (and their types)
+        of the SMILES to be translated, created by ``_parse_smiles``.
+    :param rings: See ``rings`` in ``_translate_smiles``.
+    :param counter: a one-element list that serves as a mutable counter.
+        See ``derived_counter`` in ``_translate_smiles``.
+    :return: A tuple of the translated SELFIES and its symbol length.
+    """
+
+    selfies = ""
+    selfies_len = 0
+    prev_idx = -1
+
+    for bond, symbol, symbol_type in smiles_gen:
+
+        if bond == '-':  # ignore explicit single bonds
+            bond = ''
+
+        if symbol_type == ATOM_TYPE:
+            if symbol[0] == '[':
+                selfies += "[{}{}expl]".format(bond, symbol[1:-1])
+            else:
+                selfies += "[{}{}]".format(bond, symbol)
+            prev_idx = counter[0]
+            counter[0] += 1
+            selfies_len += 1
+
+        elif symbol_type == BRANCH_TYPE:
+            if symbol == '(':
+
+                # NOTE: looping inside a loop on a generator will produce
+                # expected behaviour in this case.
+
+                branch, branch_len = _translate_smiles_derive(
+                    smiles_gen, rings, counter
+                )
+
+                N_as_symbols = get_symbols_from_n(branch_len - 1)
+                bond_num = get_num_from_bond(bond)
+
+                selfies += "[Branch{}_{}]".format(len(N_as_symbols), bond_num)
+                selfies += ''.join(N_as_symbols) + branch
+                selfies_len += 1 + len(N_as_symbols) + branch_len
+
+            else:  # symbol == ')'
+                break
+
+        else:  # symbol_type == RING_TYPE
+            ring_id = int(symbol)
+
+            if ring_id in rings:
+                left_bond, left_end = rings.pop(ring_id)
+                right_bond, right_end = bond, prev_idx
+
+                ring_len = right_end - left_end
+                N_as_symbols = get_symbols_from_n(ring_len - 1)
+
+                if left_bond != '':
+                    selfies += "[Expl{}Ring{}]".format(left_bond, len(N_as_symbols))
+                elif right_bond != '':
+                    selfies += "[Expl{}Ring{}]".format(right_bond, len(N_as_symbols))
+                else:
+                    selfies += "[Ring{}]".format(len(N_as_symbols))
+
+                selfies += ''.join(N_as_symbols)
+                selfies_len += 1 + len(N_as_symbols)
+
+            else:
+                rings[ring_id] = (bond, prev_idx)
+
+    return selfies, selfies_len
