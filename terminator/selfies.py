@@ -787,3 +787,33 @@ def _form_rings_bilocally(
 
         derived[left_idx][0] += bond_symbol + ring_id
         derived[right_idx][0] += bond_symbol + ring_id
+
+
+def split_selfies(selfies: str) -> Iterable[str]:
+    """Splits a SELFIES into its symbols.
+    Returns an iterable that yields the symbols of a SELFIES one-by-one
+    in the order they appear in the string. SELFIES symbols are always
+    either indicated by an open and closed square bracket, or are the ``'.'``
+    dot-bond symbol.
+    :param selfies: the SELFIES to be read.
+    :return: an iterable of the symbols of ``selfies`` in the same order
+        they appear in the string.
+    :Example:
+    >>> import selfies
+    >>> list(selfies.split_selfies('[C][O][C]'))
+    ['[C]', '[O]', '[C]']
+    >>> list(selfies.split_selfies('[C][=C][F].[C]'))
+    ['[C]', '[=C]', '[F]', '.', '[C]']
+    """
+
+    left_idx = selfies.find("[")
+
+    while 0 <= left_idx < len(selfies):
+        right_idx = selfies.find("]", left_idx + 1)
+        next_symbol = selfies[left_idx : right_idx + 1]
+        yield next_symbol
+
+        left_idx = right_idx + 1
+        if selfies[left_idx : left_idx + 1] == ".":
+            yield "."
+            left_idx += 1
