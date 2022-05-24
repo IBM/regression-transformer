@@ -385,12 +385,18 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
         Returns:
             extracted tokens.
         """
+        tokens = []
+        if text.startswith(self.expression_separator):
+            text = text[1:]
+            tokens.append(self.expression_separator)
         if text.startswith('<') and text.endswith('>'):
-            tokens = re.compile(r"\s*(<\w+>)\s").split(text)
-            if len(tokens) != 1:
-                raise ValueError(f'Problem in processing {tokens}')
+            prop_tokens = re.compile(r"\s*(<\w+>)\s").split(text)
+            
+            if len(prop_tokens) != 1:
+                raise ValueError(f'Problem in processing {text}: ({prop_tokens})')
+            tokens.extend(prop_tokens)
             return tokens
-        tokens = super()._tokenize(text)
+        tokens.extend(super()._tokenize(text))
         return tokens
 
     def tokenize(self, *args, **kwargs) -> List[str]:
