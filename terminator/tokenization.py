@@ -108,7 +108,7 @@ class SelfiesTokenizer(CharacterTokenizer):
         Returns:
             Tokens: the tokenized SELFIES.
         """
-        logger.info(
+        logger.debug(
             "tokenize_selfies might differ from selfies new internal `split_selfies` method"
         )
         try:
@@ -219,6 +219,10 @@ class ExpressionBertTokenizer(BertTokenizer):
             a list of vocabulary tokens.
         """
         return list(self.vocab.keys())
+
+    def update_vocab(self) -> None:
+        """Update the vocabulary with the added tokens."""
+        self.vocab = dict(self.vocab, **self.added_tokens_encoder)
 
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize a text representing an expression.
