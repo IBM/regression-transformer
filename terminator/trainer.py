@@ -744,10 +744,6 @@ class CustomTrainer(Trainer):
                 find_unused_parameters=True,
             )
 
-        if self.tb_writer is not None:
-            self.tb_writer.add_text("args", self.args.to_json_string())
-            self.tb_writer.add_hparams(self.args.to_sanitized_dict(), metric_dict={})
-
         # Train!
         total_train_batch_size = (self.args.train_batch_size * self.args.gradient_accumulation_steps *
                                   (torch.distributed.get_world_size() if self.args.local_rank != -1 else 1))
