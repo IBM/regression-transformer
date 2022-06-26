@@ -2,7 +2,7 @@
 import logging
 import re
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Set
 
 import torch
 import transformers
@@ -220,9 +220,28 @@ class ExpressionBertTokenizer(BertTokenizer):
         """
         return list(self.vocab.keys())
 
-    def update_vocab(self) -> None:
-        """Update the vocabulary with the added tokens."""
-        self.vocab = dict(self.vocab, **self.added_tokens_encoder)
+    def update_vocab(self, tokens: Set[str]) -> None:
+        """Update the vocabulary with the added tokens.
+
+        Args:
+            tokens: tokens that should be added to the vocabulary.
+        """
+
+        # Update token to idx mapping and reset added_tokens_encoder
+        self.vocab.update(self.added_tokens_encoder)
+        self.added_tokens_encoder = {}
+
+        # Update idx to token mapping
+        self.ids_to_tokens.update(self.added_tokens_decoder)
+        self.added_tokens_decoder = {}
+
+        # Fix a problem in base tokenizer that prevents splitting added tokens:
+        # https://github.com/huggingface/transformers/issues/7549
+        self.unique_no_split_tokens = list(
+            set(self.unique_no_split_tokens).difference(tokens)
+        )
+        self._create_trie(self.unique_no_split_tokens)
+
 
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize a text representing an expression.
