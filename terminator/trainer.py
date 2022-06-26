@@ -50,6 +50,9 @@ class CustomTrainer(Trainer):
         # Remove keyword arguments unwanted by parent class
         child_kwargs = get_trainer_dict(kwargs)
         kwargs = {k: v for k, v in kwargs.items() if k not in child_kwargs}
+        if kwargs.get('prediction_loss_only') is not None:
+            setattr(kwargs['args'], 'prediction_loss_only', kwargs['prediction_loss_only'])
+            kwargs.pop('prediction_loss_only')
 
         # Call parent class constructor
         super().__init__(*args, **kwargs)
@@ -329,8 +332,12 @@ class CustomTrainer(Trainer):
         return loss
 
     def prediction_step(
-            self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]],
-            prediction_loss_only: bool) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]:
+            self,
+            model: nn.Module,
+            inputs: Dict[str, Union[torch.Tensor, Any]],
+            prediction_loss_only: bool,
+            ignore_keys: List[str] = [],
+        ) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]:
         """
         NOTE: Overwritten here to enable custom embeddings + for moinitoring purposes.
 
@@ -859,8 +866,7 @@ class CustomTrainer(Trainer):
 
                         self.log(logs)
 
-                    if (self.args.evaluate_during_training and self.global_step % self.args.eval_steps == 0):
-                        metrics = self.evaluate()
+                    if (self.args.evaluation_strategy and self.global_step % self.args.eval_steps == 0):
                         self.property_evaluate()
                     if (self.args.save_steps > 0 and self.global_step % self.args.save_steps == 0):
                         # In all cases (even distributed/parallel), self.model is always a reference
@@ -941,11 +947,9 @@ class CustomTrainer(Trainer):
                 output_dir = os.path.join(self.args.output_dir, checkpoint_folder)
                 self.save_model(output_dir)
                 # Save optimizer and scheduler
-                if self.is_world_master():
-                    torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
                 checkpoint_prefix = f"{PREFIX_CHECKPOINT_DIR}-rmse-min"
-                if self.is_world_process_zero():
-                    self._rotate_checkpoints(prefix=checkpoint_prefix)
+                self._rotate_checkpoints(prefix=checkpoint_prefix)
 
                 save_path = os.path.join(output_dir, f"best_rmse_{prop[1:-1]}.json")
                 with open(save_path, "w") as f:
@@ -958,11 +962,9 @@ class CustomTrainer(Trainer):
                 output_dir = os.path.join(self.args.output_dir, checkpoint_folder)
                 self.save_model(output_dir)
                 # Save optimizer and scheduler
-                if self.is_world_master():
-                    torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
                 checkpoint_prefix = f"{PREFIX_CHECKPOINT_DIR}-pearson-max"
-                if self.is_world_process_zero():
-                    self._rotate_checkpoints(prefix=checkpoint_prefix)
+                self._rotate_checkpoints(prefix=checkpoint_prefix)
 
                 save_path = os.path.join(output_dir, f"best_pearson_{prop[1:-1]}_.json")
                 with open(save_path, "w") as f:
@@ -975,11 +977,9 @@ class CustomTrainer(Trainer):
                 output_dir = os.path.join(self.args.output_dir, checkpoint_folder)
                 self.save_model(output_dir)
                 # Save optimizer and scheduler
-                if self.is_world_master():
-                    torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                torch.save(self.optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
                 checkpoint_prefix = f"{PREFIX_CHECKPOINT_DIR}-spearman-max"
-                if self.is_world_process_zero():
-                    self._rotate_checkpoints(prefix=checkpoint_prefix)
+                self._rotate_checkpoints(prefix=checkpoint_prefix)
 
                 save_path = os.path.join(output_dir, f"best_spearman_{prop[1:-1]}_.json")
                 with open(save_path, "w") as f:
