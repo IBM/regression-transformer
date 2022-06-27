@@ -851,11 +851,11 @@ class CustomTrainer(Trainer):
                     torch.cuda.empty_cache()
                     self.global_step += 1
                     self.epoch = epoch + (step + 1) / len(epoch_iterator)
+                    logs: Dict[str, float] = {}
 
                     if (self.args.logging_steps > 0
                             and self.global_step % self.args.logging_steps == 0) or (self.global_step == 1
                                                                                      and self.args.logging_first_step):
-                        logs: Dict[str, float] = {}
                         tr_loss_scalar = tr_loss.item()
                         logs["loss"] = (tr_loss_scalar - logging_loss_scalar) / self.args.logging_steps
                         # backward compatibility for pytorch schedulers
@@ -899,14 +899,12 @@ class CustomTrainer(Trainer):
                 break
 
         train_pbar.close()
-        if self.tb_writer:
-            self.tb_writer.close()
         if self.args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
             delattr(self, "_past")
 
         logger.info("\n\nTraining completed. Do not forget to share your model on huggingface.co/models =)\n\n")
-        return TrainOutput(self.global_step, tr_loss.item() / self.global_step)
+        return TrainOutput(self.global_step, tr_loss.item() / self.global_step, metrics=logs)
 
     def get_cg_mode(self, x: int) -> bool:
         """
