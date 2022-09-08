@@ -1,12 +1,48 @@
 # Regression Transformer
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Codebase to experiment with a hybrid Transformer that combines conditional sequence generation with regression
+A multitask Transformer that reformulates regression as a conditional sequence modeling task.
+This yields a dichotomous language model that seamlessly integrates regression with property-driven conditional generation task.
 
 ![Summary](assets/overview.jpg).
 
+## Use the pretrained models
+The Regression Transformer is implemented in the [GT4SD](https://github.com/GT4SD/gt4sd-core) library.
+Via GT4SD, using several pretrained RegressionTransformers is a matter of a few lines of code :rocket 
+See the tutorial [here](https://github.com/GT4SD/gt4sd-core/blob/main/notebooks/regression-transformer-demo.ipynb).
+Via GT4SD you can use the RT pretrained on small molecules with some properties as shown in the paper, in particular [QED](https://www.nature.com/articles/nchem.1243) and [ESOL](https://pubs.acs.org/doi/10.1021/ci034243x) (water solubility). There is also a multiproperty variant of the RT: a model trained jointly on logP and synthesizability (aka [SCScore](https://pubs.acs.org/doi/10.1021/acs.jcim.7b00622)).
+For protein language modeling, you will also find a RT trained on a [peptide stability](https://www.science.org/doi/full/10.1126/science.aan0693) dataset from the [TAPE](https://github.com/songlab-cal/tape) benchmark.
+
+If you use [GT4SD](https://github.com/GT4SD/gt4sd-core)) can generate molecules like this:
+```
+from gt4sd.algorithms.conditional_generation.regression_transformer import (
+    RegressionTransformer, RegressionTransformerMolecules
+)
+
+buturon = "CC(C#C)N(C)C(=O)NC1=CC=C(Cl)C=C1"
+target_esol = -3.53 
+config = RegressionTransformerMolecules(
+    algorithm_version="solubility",
+    search="sample",
+    temperature=2, 
+    tolerance=5,
+    sampling_wrapper={
+        'property_goal': {'<esol>': target_esol}, 
+        'fraction_to_mask': 0.2
+    }
+)
+esol_generator = RegressionTransformer(configuration=config, target=buturon)
+generations = list(esol_generator.sample(8))
+```
+
+Explore the solubility of the local chemical space around Buturon. Upon varying the property primers, you might obtain something like this:
+![Esol](assets/esol.png).
+
+
+
 
 ## Development setup
+This is mainly intended to reproduce or extend the results of the paper.
 ```console
 conda env create -f conda.yml
 conda activate terminator
