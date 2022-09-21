@@ -17,6 +17,7 @@ SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n
 
 class RegexTokenizer:
     """Run regex tokenization"""
+
     def __init__(self, regex_pattern: str) -> None:
         """Constructs a RegexTokenizer.
 
@@ -41,6 +42,7 @@ class RegexTokenizer:
 
 class PropertyTokenizer:
     """Run a property tokenization."""
+
     def __init__(self) -> None:
         """Constructs a PropertyTokenizer."""
         self.regex = re.compile(r"\s*(<\w+>)\s*?(\+|-)?(\d+)(\.)?(\d+)?\s*")
@@ -61,11 +63,16 @@ class PropertyTokenizer:
             tokens = [property_name]
             if sign:
                 tokens += [f"_{sign}_"]
-            tokens += [f"_{number}_{position}_" for position, number in enumerate(units[::-1])][::-1]
+            tokens += [
+                f"_{number}_{position}_" for position, number in enumerate(units[::-1])
+            ][::-1]
             if dot:
                 tokens += [f"_{dot}_"]
             if decimals:
-                tokens += [f"_{number}_-{position}_" for position, number in enumerate(decimals, 1)]
+                tokens += [
+                    f"_{number}_-{position}_"
+                    for position, number in enumerate(decimals, 1)
+                ]
         return tokens
 
 
@@ -122,8 +129,35 @@ class SelfiesTokenizer(CharacterTokenizer):
             return ['']
 
 
+class ReactionSmilesTokenizer(CharacterTokenizer):
+    def __init__(self, precursor_separator: str = '<energy>') -> None:
+        """
+        Constructs an expression tokenizer for reaction SMILES.
+
+        Args:
+            precursor_separator: a token that separates different precursors from
+                another. Defaults to '<energy>'.
+
+        """
+        self.precursor_separator = precursor_separator
+        self.tokenizer = RegexTokenizer(regex_pattern=SMILES_TOKENIZER_PATTERN)
+
+    def tokenize(self, text: str) -> List[str]:
+        """Tokenize an expression.
+
+        Args:
+            text: text to tokenize.
+
+        Returns:
+            extracted tokens.
+        """
+        return self.tokenizer.tokenize(text)
+
+
 class ExpressionTokenizer:
-    def __init__(self, expression_tokenizer: str = "|", language: str = "SMILES") -> None:
+    def __init__(
+        self, expression_tokenizer: str = "|", language: str = "SMILES"
+    ) -> None:
         """Constructs an expression tokenizer.
 
         Args:
@@ -139,8 +173,12 @@ class ExpressionTokenizer:
             self.text_tokenizer = SelfiesTokenizer()
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
+        elif language == 'REACTION_SMILES':
+            self.text_tokenizer = ReactionSmilesTokenizer()
         else:
-            raise ValueError(f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'.")
+            raise ValueError(
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'."
+            )
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = expression_tokenizer
 
@@ -170,8 +208,20 @@ class ExpressionBertTokenizer(BertTokenizer):
     Args:
         vocab_file: path to a token per line vocabulary file.
     """
-    def __init__(self, vocab_file, unk_token="[UNK]", sep_token="[SEP]", pad_token="[PAD]", cls_token="[CLS]",
-                 mask_token="[MASK]", pad_even: bool = True, language: str = "SMILES", **kwargs) -> None:
+
+    def __init__(
+        self,
+        vocab_file,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        pad_even: bool = True,
+        language: str = "SMILES",
+        precursor_separator: str = '<energy>',
+        **kwargs,
+    ) -> None:
         """Constructs an ExpressionTokenizer.
 
         Args:
@@ -186,9 +236,20 @@ class ExpressionBertTokenizer(BertTokenizer):
                 True.
             language (str): Identifier for the (chemical) language. Should be either
                 'SMILES', 'SELFIES' or 'AAS'.
+            precursor_separator: a token that separates different precursors from
+                another. Used only for REACTION sequences. Defaults to '<energy>'.
         """
-        super().__init__(vocab_file=vocab_file, do_lower_case=False, do_basic_tokenize=True, unk_token=unk_token,
-                         sep_token=sep_token, pad_token=pad_token, cls_token=cls_token, mask_token=mask_token, **kwargs)
+        super().__init__(
+            vocab_file=vocab_file,
+            do_lower_case=False,
+            do_basic_tokenize=True,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+            **kwargs,
+        )
         # define tokenization utilities
         self.language = language
         if language == "SMILES":
@@ -197,8 +258,15 @@ class ExpressionBertTokenizer(BertTokenizer):
             self.text_tokenizer = SelfiesTokenizer()
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
+        elif language == 'REACTION_SMILES':
+            self.text_tokenizer = ReactionSmilesTokenizer(
+                precursor_separator=precursor_separator
+            )
+            self.presep = precursor_separator
         else:
-            raise ValueError(f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'.")
+            raise ValueError(
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'."
+            )
 
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = "|"
@@ -242,7 +310,6 @@ class ExpressionBertTokenizer(BertTokenizer):
         )
         self._create_trie(self.unique_no_split_tokens)
 
-
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize a text representing an expression.
 
@@ -263,7 +330,9 @@ class ExpressionBertTokenizer(BertTokenizer):
         # length sequences
         return self.pad_even_fn(tokens)
 
-    def add_padding_tokens(self, token_ids: List[int], max_length: int, padding_right: bool = True) -> List[int]:
+    def add_padding_tokens(
+        self, token_ids: List[int], max_length: int, padding_right: bool = True
+    ) -> List[int]:
         """Adds padding tokens to return a sequence of length max_length.
 
         By default padding tokens are added to the right of the sequence.
@@ -298,7 +367,9 @@ class ExpressionBertTokenizer(BertTokenizer):
         return [i if el == "[UNK]" else el for el, i in zip(mlm_label, mlm_input)]
 
     @staticmethod
-    def get_sample_prediction(mlm_prediction: List[str], mlm_input: List[str]) -> List[str]:
+    def get_sample_prediction(
+        mlm_prediction: List[str], mlm_input: List[str]
+    ) -> List[str]:
         """MLM case: Retrieve predicted sequence from mlm prediction and mlm input
         NOTE: Also works for PLM.
 
@@ -309,7 +380,9 @@ class ExpressionBertTokenizer(BertTokenizer):
         Returns:
             List[str]: Sample sequence as part of the dataset
         """
-        return [i if i not in ["[MASK]"] else o for o, i in zip(mlm_prediction, mlm_input)]
+        return [
+            i if i not in ["[MASK]"] else o for o, i in zip(mlm_prediction, mlm_input)
+        ]
 
     @staticmethod
     def floating_tokens_to_float(token_ids: List[str]) -> float:
@@ -330,7 +403,9 @@ class ExpressionBertTokenizer(BertTokenizer):
             float_value = -1
         return float_value
 
-    def aggregate_tokens(self, token_ids: List[str], label_mode: bool, cls_first: bool = True) -> Tuple[str, Dict]:
+    def aggregate_tokens(
+        self, token_ids: List[str], label_mode: bool, cls_first: bool = True
+    ) -> Tuple[str, Dict]:
         """Receives tokens of one sample and returns sequence (e.g. SMILES) and
         a dict of properties.
 
@@ -352,10 +427,24 @@ class ExpressionBertTokenizer(BertTokenizer):
 
         edx = -1 if edx == 1000 else edx
 
-        seq = ("".join(token_ids[token_ids.index("|") + 1:edx]) if "|" in token_ids else "".join(token_ids))
+        # Special handling for reaction models
+        if 'REACTION' in self.language:
+            en_idxs = [i for i, x in enumerate(token_ids) if x == self.presep]
+            for i, idx in enumerate(en_idxs):
+                if idx + 2 in en_idxs and token_ids[idx + 1] != '.':
+                    logger.info(f'Replacing, {token_ids[idx + 1]} with `.` ')
+                    token_ids[idx + 1] = '.'
+
+        seq = (
+            "".join(token_ids[token_ids.index("|") + 1 : edx])
+            if "|" in token_ids
+            else "".join(token_ids)
+        )
         property_dict = {}
         for idx, t in enumerate(token_ids):
             if t.startswith("<") and t.endswith(">"):
+                if 'REACTION' in self.language and t == self.presep:
+                    continue
                 key = t[1:-1]
 
                 # Convert float
@@ -363,7 +452,9 @@ class ExpressionBertTokenizer(BertTokenizer):
                 while token_ids[end_floating_idx].startswith("_"):
                     end_floating_idx += 1
 
-                prop = self.floating_tokens_to_float(token_ids[idx + 1:end_floating_idx])
+                prop = self.floating_tokens_to_float(
+                    token_ids[idx + 1 : end_floating_idx]
+                )
 
                 property_dict[key] = prop
 
@@ -385,6 +476,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif self.language == "SELFIES":
             return decoder(sequence)
         elif self.language == "AAS":
+            return sequence
+        elif self.language == 'REACTION_SMILES':
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
@@ -414,7 +507,7 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
             tokens.append(self.expression_separator)
         if text.startswith('<') and text.endswith('>'):
             prop_tokens = re.compile(r"\s*(<\w+>)\s").split(text)
-            
+
             if len(prop_tokens) != 1:
                 raise ValueError(f'Problem in processing {text}: ({prop_tokens})')
             tokens.extend(prop_tokens)
@@ -433,4 +526,3 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
         text = super().tokenize(*args, **kwargs)
         text = text if len(text) % 2 == 0 else text + [self.pad_token]
         return text
-
