@@ -119,11 +119,23 @@ class SelfiesTokenizer(CharacterTokenizer):
             "tokenize_selfies might differ from selfies new internal `split_selfies` method"
         )
         try:
-            selfies = selfies.replace('.', '[.]')  # to allow parsing unbound atoms
-            selfies_char_list_pre = selfies[1:-1].split('][')
-            return [
-                '[' + selfies_element + ']' for selfies_element in selfies_char_list_pre
-            ]
+            if "." not in selfies:
+                # Canonical case (only single entity)
+                selfies_char_list_pre = selfies[1:-1].split("][")
+                return [
+                    "[" + selfies_element + "]"
+                    for selfies_element in selfies_char_list_pre
+                ]
+
+            # Multiple entities present
+            splitted = []
+            for selfie in selfies.split("."):
+                selfies_char_list_pre = selfie[1:-1].split("][")
+                split_selfie = ["[" + se + "]" for se in selfies_char_list_pre]
+                splitted.extend(split_selfie)
+                splitted.append(".")
+
+            return splitted[:-1]
         except Exception:
             logger.warning(f'Error in tokenizing {selfies}. Returning empty list.')
             return ['']
