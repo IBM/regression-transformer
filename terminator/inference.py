@@ -20,15 +20,27 @@ class InferenceRT:
         self.model.eval()
 
         self.params = config.to_dict()
-        self.use_ne = self.params['use_ne']
+        self.use_ne = self.params.get(
+            "use_numerical_encodings", self.params.get("use_ne", True)
+        )
 
         if self.use_ne:
-            self.ne_type = self.params["ne_type"]
-            self.ne_format = self.params["ne_format"]
+            self.ne_type = self.params.get(
+                "numerical_encodings_type", self.params.get("ne_type")
+            )
+            self.ne_format = self.params.get(
+                "numerical_encodings_format", self.params.get("ne_format")
+            )
+            if self.ne_type != "float":
+                raise ValueError(
+                    f"Numerical encoding type {self.ne_type} is not supported"
+                )
 
             if self.ne_format == "concat":
                 self.combine_embed = self.overwrite_embed
-                self.ne_dim = self.params["ne_dim"]
+                self.ne_dim = self.params.get(
+                    "numerical_encodings_dim", self.params.get("ne_dim")
+                )
             elif self.ne_format == "sum":
                 self.combine_embed = self.sum_embed
                 # NE dim has to be identical to real embedding dim
