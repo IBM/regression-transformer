@@ -4,3 +4,4 @@ tqdm
 numpy
 modlamp>=4.3.0
 selfies==1.0.4
+psutil
