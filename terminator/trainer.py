@@ -638,7 +638,7 @@ class CustomTrainer(Trainer):
             iterator (:obj:`tqdm`, `optional`):
                 A potential tqdm progress bar to write the logs on.
         """
-        super().log(logs, iterator)
+        super().log(logs)
 
         if "eval_loss" in logs.keys():
             logger.info(f"Evaluation {logs}")
@@ -661,7 +661,7 @@ class CustomTrainer(Trainer):
                 self.min_loss = logs["loss"]
                 self.save_model(output_dir)
                 # Save optimizer and scheduler
-                if self.is_world_master():
+                if self.is_world_process_zero():
                     torch.save(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, "optimizer.pt"),
