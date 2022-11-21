@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
+POLYMER_GRAPH_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|A|B|C|D|E|R|Q|Z|;|<|>|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 
 
 class RegexTokenizer:
@@ -137,12 +138,12 @@ class SelfiesTokenizer(CharacterTokenizer):
 
             return splitted[:-1]
         except Exception:
-            logger.warning(f'Error in tokenizing {selfies}. Returning empty list.')
-            return ['']
+            logger.warning(f"Error in tokenizing {selfies}. Returning empty list.")
+            return [""]
 
 
 class ReactionSmilesTokenizer(CharacterTokenizer):
-    def __init__(self, precursor_separator: str = '<energy>') -> None:
+    def __init__(self, precursor_separator: str = "<energy>") -> None:
         """
         Constructs an expression tokenizer for reaction SMILES.
 
@@ -166,6 +167,34 @@ class ReactionSmilesTokenizer(CharacterTokenizer):
         return self.tokenizer.tokenize(text)
 
 
+class PolymerGraphTokenizer:
+    def __init__(self) -> None:
+        """Constructs a tokenizer for processing string representations of Polymers"""
+
+        # split into units of <...> but skip over ->
+        self.tokenizer = RegexTokenizer(regex_pattern="<.*?[^-]>")
+        self.node_tokenizer = RegexTokenizer(
+            regex_pattern=POLYMER_GRAPH_TOKENIZER_PATTERN
+        )
+
+    def tokenize(self, text: str) -> List[str]:
+        """Tokenize an expression.
+
+        Args:
+            text: text to tokenize.
+
+        Returns:
+            extracted tokens.
+        """
+        tokens = []
+        for node in self.tokenizer.tokenize(text):
+            for block in node.split("->"):
+                tokens.extend(self.node_tokenizer.tokenize(block))
+                tokens.append("->")
+            del tokens[-1]
+        return tokens
+
+
 class ExpressionTokenizer:
     def __init__(
         self, expression_tokenizer: str = "|", language: str = "SMILES"
@@ -185,11 +214,13 @@ class ExpressionTokenizer:
             self.text_tokenizer = SelfiesTokenizer()
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
-        elif language == 'REACTION_SMILES':
-            self.text_tokenizer = ReactionSmilesTokenizer()
+        elif language == "REACTION_SMILES":
+            self.text_tokenizer = PolymerGraphTokenizer()
+        elif language == "Polymer":
+            self.text_tokenizer = CharacterTokenizer()
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'."
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
             )
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = expression_tokenizer
@@ -231,7 +262,7 @@ class ExpressionBertTokenizer(BertTokenizer):
         mask_token="[MASK]",
         pad_even: bool = True,
         language: str = "SMILES",
-        precursor_separator: str = '<energy>',
+        precursor_separator: str = "<energy>",
         **kwargs,
     ) -> None:
         """Constructs an ExpressionTokenizer.
@@ -247,7 +278,7 @@ class ExpressionBertTokenizer(BertTokenizer):
                 be padded to have an even length. Neede for PLM in XLNet. Defaults to
                 True.
             language (str): Identifier for the (chemical) language. Should be either
-                'SMILES', 'SELFIES' or 'AAS'.
+                'SMILES', 'SELFIES' or 'AAS', 'REACTION_SMILES' or 'Polymer'.
             precursor_separator: a token that separates different precursors from
                 another. Used only for REACTION sequences. Defaults to '<energy>'.
         """
@@ -270,14 +301,16 @@ class ExpressionBertTokenizer(BertTokenizer):
             self.text_tokenizer = SelfiesTokenizer()
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
-        elif language == 'REACTION_SMILES':
+        elif language == "REACTION_SMILES":
             self.text_tokenizer = ReactionSmilesTokenizer(
                 precursor_separator=precursor_separator
             )
             self.presep = precursor_separator
+        elif language == "Polymer":
+            self.text_tokenizer = PolymerGraphTokenizer()
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES' or 'AAS'."
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
             )
 
         self.property_tokenizer = PropertyTokenizer()
@@ -440,12 +473,12 @@ class ExpressionBertTokenizer(BertTokenizer):
         edx = -1 if edx == 1000 else edx
 
         # Special handling for reaction models
-        if 'REACTION' in self.language:
+        if "REACTION" in self.language:
             en_idxs = [i for i, x in enumerate(token_ids) if x == self.presep]
             for i, idx in enumerate(en_idxs):
-                if idx + 2 in en_idxs and token_ids[idx + 1] != '.':
-                    logger.info(f'Replacing, {token_ids[idx + 1]} with `.` ')
-                    token_ids[idx + 1] = '.'
+                if idx + 2 in en_idxs and token_ids[idx + 1] != ".":
+                    logger.info(f"Replacing, {token_ids[idx + 1]} with `.` ")
+                    token_ids[idx + 1] = "."
 
         seq = (
             "".join(token_ids[token_ids.index("|") + 1 : edx])
@@ -455,7 +488,7 @@ class ExpressionBertTokenizer(BertTokenizer):
         property_dict = {}
         for idx, t in enumerate(token_ids):
             if t.startswith("<") and t.endswith(">"):
-                if 'REACTION' in self.language and t == self.presep:
+                if "REACTION" in self.language and t == self.presep:
                     continue
                 key = t[1:-1]
 
@@ -489,7 +522,7 @@ class ExpressionBertTokenizer(BertTokenizer):
             return decoder(sequence)
         elif self.language == "AAS":
             return sequence
-        elif self.language == 'REACTION_SMILES':
+        elif self.language == "REACTION_SMILES":
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
@@ -517,11 +550,11 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
         if text.startswith(self.expression_separator):
             text = text[1:]
             tokens.append(self.expression_separator)
-        if text.startswith('<') and text.endswith('>'):
+        if text.startswith("<") and text.endswith(">"):
             prop_tokens = re.compile(r"\s*(<\w+>)\s").split(text)
 
             if len(prop_tokens) != 1:
-                raise ValueError(f'Problem in processing {text}: ({prop_tokens})')
+                raise ValueError(f"Problem in processing {text}: ({prop_tokens})")
             tokens.extend(prop_tokens)
             return tokens
         tokens.extend(super()._tokenize(text))
