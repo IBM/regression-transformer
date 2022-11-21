@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
-POLYMER_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|A|B|C|D|E|R|Q|Z|;|<|>|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
+POLYMER_GRAPH_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|A|B|C|D|E|R|Q|Z|;|<|>|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 
 
 class RegexTokenizer:
@@ -167,13 +167,15 @@ class ReactionSmilesTokenizer(CharacterTokenizer):
         return self.tokenizer.tokenize(text)
 
 
-class PolymerTokenizer:
+class PolymerGraphTokenizer:
     def __init__(self) -> None:
         """Constructs a tokenizer for processing string representations of Polymers"""
 
         # split into units of <...> but skip over ->
         self.tokenizer = RegexTokenizer(regex_pattern="<.*?[^-]>")
-        self.node_tokenizer = RegexTokenizer(regex_pattern=POLYMER_TOKENIZER_PATTERN)
+        self.node_tokenizer = RegexTokenizer(
+            regex_pattern=POLYMER_GRAPH_TOKENIZER_PATTERN
+        )
 
     def tokenize(self, text: str) -> List[str]:
         """Tokenize an expression.
@@ -213,7 +215,7 @@ class ExpressionTokenizer:
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
         elif language == "REACTION_SMILES":
-            self.text_tokenizer = PolymerTokenizer()
+            self.text_tokenizer = PolymerGraphTokenizer()
         elif language == "Polymer":
             self.text_tokenizer = CharacterTokenizer()
         else:
@@ -305,7 +307,7 @@ class ExpressionBertTokenizer(BertTokenizer):
             )
             self.presep = precursor_separator
         elif language == "Polymer":
-            self.text_tokenizer = PolymerTokenizer()
+            self.text_tokenizer = PolymerGraphTokenizer()
         else:
             raise ValueError(
                 f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
