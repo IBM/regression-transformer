@@ -524,6 +524,8 @@ class ExpressionBertTokenizer(BertTokenizer):
             return sequence
         elif self.language == "REACTION_SMILES":
             return sequence
+        elif self.language == "Polymer":
+            return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
 

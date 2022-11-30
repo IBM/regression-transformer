@@ -296,6 +296,7 @@ class Evaluator(CustomTrainer):
     def conditional_generation(
         self,
         collator,
+        prefix: str,
         save_path: str = None,
         passed_eval_fn: Callable = None,
         property_collator=None,
@@ -328,7 +329,7 @@ class Evaluator(CustomTrainer):
             eval_fn = passed_eval_fn
         else:
             eval_fn = self.get_seq_eval_fn(
-                collator=property_collator, prefix=f"<{prop}>0.123|"
+                collator=property_collator, prefix=prefix
             )
         if denormalize_params:
             denormalize = (
