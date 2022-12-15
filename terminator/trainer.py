@@ -684,7 +684,7 @@ class CustomTrainer(Trainer):
             return
 
         # Check if we should delete older checkpoint(s)
-        checkpoints_sorted = self._sorted_checkpoints(use_mtime=use_mtime, checkpoint_prefix=prefix)
+        checkpoints_sorted = self._sorted_checkpoints(use_mtime=use_mtime, checkpoint_prefix=prefix, output_dir=self.args.output_dir)
 
         if len(checkpoints_sorted) <= self.args.save_total_limit:
             return
