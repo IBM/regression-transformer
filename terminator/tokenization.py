@@ -548,7 +548,6 @@ class ExpressionBertTokenizer(BertTokenizer):
         Returns:
             A tuple of :obj:`str`: The files saved.
         """
-        print("****RUNNING NEW SAVING******")
         if os.path.isfile(save_directory):
             logger.error(
                 "Provided path ({}) should be a directory, not a file".format(
