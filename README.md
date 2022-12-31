@@ -8,27 +8,25 @@ This yields a dichotomous language model that seamlessly integrates regression w
 
 This repo contains the development code.
 
-# Demo with UI
-🤗 A gradio demo with a simple UI is available at: 
-https://huggingface.co/spaces/jannisborn/regression_transformer
+## Demo with UI
+🤗 A gradio demo with a simple UI is available at: https://huggingface.co/spaces/jannisborn/regression_transformer
+![Gradio](assets/gradio_demo.png | width=70)
 
 
-# Building upon this research
+## Building upon this research
 
 #### You want to use a pretrained RT-model or finetune it on your own data? Then read here, otherwise the development setup can be found [below](#development-setup).
 
 The Regression Transformer is implemented in the [GT4SD](https://github.com/GT4SD/gt4sd-core) library.
-Via GT4SD, using several pretrained RegressionTransformers is a matter of a few lines of code :rocket:
-A complete tutorial of running inference, finetuning a RT model (or training it from scratch) and sharing and deploying it to the GT4SD model hub, see [here](https://github.com/GT4SD/gt4sd-core/tree/main/examples/regression_transformer).
+Via GT4SD, using several pretrained RegressionTransformers is a matter of a few lines of code :rocket:.
+A complete tutorial of running inference, finetuning a RT model (or training it from scratch) and sharing and deploying it to the GT4SD model hub, can be found [here](https://github.com/GT4SD/gt4sd-core/tree/main/examples/regression_transformer).
 
 For example, via GT4SD you can use the RT pretrained on small molecules with some properties as shown in the paper, in particular [QED](https://www.nature.com/articles/nchem.1243) and [ESOL](https://pubs.acs.org/doi/10.1021/ci034243x) (water solubility). There is also several multiproperty variants of the RT: e.g., a model trained jointly on logP and synthesizability (aka [SCScore](https://pubs.acs.org/doi/10.1021/acs.jcim.7b00622)).
 For protein language modeling, you will also find a RT trained on a [peptide stability](https://www.science.org/doi/full/10.1126/science.aan0693) dataset from the [TAPE](https://github.com/songlab-cal/tape) benchmark.
 
 A jupyter notebook with a toy usecase on adapting a molecule toward solubility is provided in [GT4SD](https://github.com/GT4SD/gt4sd-core/blob/main/notebooks/regression-transformer-demo.ipynb) too.
-
-
 If you use [GT4SD](https://github.com/GT4SD/gt4sd-core), you can generate molecules like this:
-```py
+```python
 from gt4sd.algorithms.conditional_generation.regression_transformer import (
     RegressionTransformer, RegressionTransformerMolecules
 )
@@ -63,7 +61,7 @@ conda activate terminator
 pip install -e .
 ```
 
-## Generate some data
+### Generate some data
 Example data for QED can be generated using [scripts/generate_example_data.py](./scripts/generate_example_data.py).
 ```console
 python scripts/generate_example_data.py examples/example.smi examples/qed_property_example.txt
