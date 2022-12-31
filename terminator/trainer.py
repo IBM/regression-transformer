@@ -19,11 +19,10 @@ from packaging import version
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.utils.data.dataloader import DataLoader
+from torch.utils.data.dataset import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from tqdm.auto import tqdm, trange
 from transformers import Trainer, XLNetTokenizer
-from transformers.file_utils import is_torch_tpu_available
-from transformers.integrations import is_optuna_available, is_ray_available
 from transformers.trainer_utils import (
     PREFIX_CHECKPOINT_DIR,
     EvalPrediction,
@@ -1327,3 +1326,33 @@ class CustomTrainer(Trainer):
         logger.info(
             f"Current generation performances top1 and top{k}:{self.cg_perfs[:,:self.cidx]}"
         )
+
+    def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
+        """
+        Overwriting child class method to allow evaluation on the alternating dataloader (CG task)
+        Returns the evaluation :class:`~torch.utils.data.DataLoader`.
+        Will use no sampler if :obj:`self.eval_dataset` is a :obj:`torch.utils.data.IterableDataset`, a sequential
+        sampler (adapted to distributed training if necessary) otherwise.
+        Subclass and override this method if you want to inject some custom behavior.
+        Args:
+            eval_dataset (:obj:`torch.utils.data.dataset.Dataset`, `optional`):
+                If provided, will override :obj:`self.eval_dataset`.
+        """
+        if eval_dataset is None and self.eval_dataset is None:
+            raise ValueError("Trainer: evaluation requires an eval_dataset.")
+        elif eval_dataset is not None:
+            self._remove_unused_columns(eval_dataset, description="evaluation")
+        eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
+        eval_sampler = self._get_eval_sampler(eval_dataset)
+
+        if self.alternating_collator is not None:
+            logger.warning(f"Loading alternative collator for evaluation.")
+            return self.alt_eval_loader
+        else:
+            return DataLoader(
+                eval_dataset,
+                sampler=eval_sampler,
+                batch_size=self.args.eval_batch_size,
+                collate_fn=self.data_collator,
+                drop_last=self.args.dataloader_drop_last,
+            )
