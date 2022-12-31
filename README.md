@@ -73,7 +73,7 @@ python scripts/run_language_modeling.py --output_dir rt_example \
     --training_config_path training_configs/qed_alternated_cc.json
 ```
 :warning: This configuration uses dummy data, do not use as is :no_good:
-The `training_config_path` argument points to a file that specifies the training regime. This is optional, if the argument is not given, we default to vanilla PLM training that masks everywhere with equal probability (recommended for initial pretraining only). For refined examples, please see `trainining_configs` folder.
+The `training_config_path` argument points to a file that specifies the training regime. This is optional, if the argument is not given, we default to vanilla PLM training that masks everywhere with equal probability (recommended for initial pretraining only). For refined examples, please see `training_configs` folder.
 
 Also note that the `vocabs` folder contains the vocabulary files for training on small molecules, proteins and chemical reactions.
 
