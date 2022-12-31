@@ -10,7 +10,7 @@ This repo contains the development code.
 
 ## Demo with UI
 🤗 A gradio demo with a simple UI is available at: https://huggingface.co/spaces/jannisborn/regression_transformer
-<img src="https://raw.githubusercontent.com/IBM/regression-transformer/dev/assets/gradio_demo.png" width=70% height=70%>
+![Summary](assets/gradio_demo.png)
 
 
 ## Building upon this research
@@ -64,12 +64,12 @@ The processed data used to train the models is available via [Box](https://ibm.b
 ### Training a model
 You can download the data and launch a training by pointing to train and test data:
 ```console
-python scripts/run_language_modeling.py --output_dir examples/models/rt_example \
+python scripts/run_language_modeling.py --output_dir rt_example \
     --config_name configs/rt_small.json --tokenizer_name ./vocabs/smallmolecules.txt \
     --do_train --do_eval --learning_rate 1e-4 --num_train_epochs 5 --save_total_limit 2 \
-    --save_steps 500 --per_gpu_train_batch_size 16 --evaluate_during_training --eval_steps 500 \
+    --save_steps 500 --per_gpu_train_batch_size 16 --evaluate_during_training --eval_steps 5 \
     --eval_data_file ./examples/qed_property_example.txt --train_data_file ./examples/qed_property_example.txt \
-    --line_by_line --block_size 510 --seed 42 --logging_steps 250 \
+    --line_by_line --block_size 510 --seed 42 --logging_steps 100 --eval_accumulation_steps 2 \
     --training_config_path training_configs/qed_alternated_cc.json
 ```
 :warning: This configuration uses dummy data, do not use as is :no_good:
@@ -86,11 +86,11 @@ Exemplary model configurations (number of heads, layers, etc.) can be found in t
 To evaluate a model trained e.g., on the QED task, run the following:
 ```console
 python scripts/eval_language_modeling.py --output_dir path_to_model \
---eval_file ./examples/qed_property_example.txt --eval_accumulation_steps 2 --param_path qed_eval.json"
+--eval_file ./examples/qed_property_example.txt --eval_accumulation_steps 2 --param_path configs/qed_eval.json
 ```
 
-
-
+### Pretrained models
+Pretrained models are available via the GT4SD model hub. There's a total of 9 models that can also be used via [HuggingFace Spaces](https://huggingface.co/spaces/jannisborn/regression_transformer). Models that are part of the publication are also available via the [Box folder mentioned above](https://ibm.box.com/s/3xswoewcgpwnk0pkzcupgz67ds2myys2). 
 
 #### Generate some data
 To generate custom data for the QED task in a RT-compatible format, run [scripts/generate_example_data.py](./scripts/generate_example_data.py) and point to a `.smi` file with SMILES in the first column.
