@@ -38,7 +38,7 @@
     }
   },
   "untie_r": true,
-  "use_numerical_encodings": false,
+  "use_numerical_encodings": true,
   "vmax": 1.0,
-  "vocab_size": 171
+  "vocab_size": 507
 }

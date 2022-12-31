@@ -1,0 +1,9 @@
+{
+    "reset_training_loss": true,
+    "alternate_tasks": false,
+    "task": "proponly",
+    "checkpoint-str": "pearson",
+    "property_tokens": [
+        "<qed>"
+    ]
+}

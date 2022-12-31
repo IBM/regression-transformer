@@ -1,0 +1,38 @@
+{
+    "plm_probability": 0.4,
+    "checkpoint-str": "rmse",
+    "max_span_length": 7,
+    "conditioning_range": [
+        [
+            0.051,
+            0.151,
+            0.251,
+            0.351,
+            0.451,
+            0.551,
+            0.651,
+            0.751,
+            0.851,
+            0.951
+        ]
+    ],
+    "line_by_line": true,
+    "property_tokens": [
+        "<qed>"
+    ],
+    "property_tokens_to_mask": [
+        [
+            5
+        ]
+    ],
+    "property_token_masking_order": [
+        [
+            2,
+            3,
+            4,
+            0,
+            1
+        ]
+    ],
+    "beam_width": 3
+}

@@ -1,0 +1,19 @@
+{
+    "reset_training_loss": true,
+    "alternate_tasks": true,
+    "cc_loss": true,
+    "property_tokens": [
+        "<qed>"
+    ],
+    "alternate_steps": 50,
+    "checkpoint-str": "best",
+    "cg_collator": "vanilla_cg",
+    "cg_collator_params": {
+        "do_sample": false,
+        "property_tokens": [
+            "<qed>"
+        ],
+        "plm_probability": 0.4,
+        "max_span_length": 12
+    }
+}

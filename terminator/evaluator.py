@@ -261,7 +261,9 @@ class Evaluator(CustomTrainer):
                     _, gen_prop = self.tokenizer.aggregate_tokens(gen, label_mode=False)
                     # print('gen_prop is', gen_prop)
 
-                    property_predictions[sidx, idx] = gen_prop[_prop] / rmse_factor
+                    property_predictions[sidx, idx] = (
+                        gen_prop.get(_prop, -1) / rmse_factor
+                    )
                     if idx == 0:
                         property_labels[sidx] = target_prop[_prop] / rmse_factor
 
@@ -446,7 +448,7 @@ class Evaluator(CustomTrainer):
                 else:
                     value, prop_dict = eval_fn(gen_seq)
                     value = denormalize(value)
-                    prop_dict[prop.lower()] = value
+                    prop_dict[prop.lower()] = round(value, 4)
                 prop_dicts.append(prop_dict)
 
                 # except Exception:
@@ -496,8 +498,29 @@ class Evaluator(CustomTrainer):
             remaining_props = remaining_props.rename(columns=replacer)
             remaining_props = remaining_props.drop(columns=[f"Gen{prop}"])
             df = pd.concat([df, remaining_props], axis=1)
-            df = df.drop_duplicates(subset="GenSequence")
+            df["sort_helper"] = df.Search.apply(
+                lambda x: {"Greedy": 0, "Sampling": 2}.get(x, 1)
+            )
+            df = df.sort_values(
+                by=["SeedSequence", "Search", f"Primer{prop}"],
+                ascending=[True, False, True],
+            ).drop_duplicates(subset=["GenSequence", "SeedSequence"])
             df.to_csv(os.path.join(save_path))
+            print(f"Data frame has {len(df)} samples, saved in {save_path}")
+            spearmans = [
+                spearmanr(
+                    df[(df.SeedSequence == x) & (df.Search == "Sampling")][
+                        f"Primer{prop}"
+                    ],
+                    df[(df.SeedSequence == x) & (df.Search == "Sampling")][
+                        f"Gen{prop}"
+                    ],
+                )[0]
+                for x in df.SeedSequence.unique()
+            ]
+            print(
+                f"Average per sample Spearman for sampling search: {np.nanmean(spearmans)}"
+            )
 
     def get_seq_eval_fn(self, collator: PropertyCollator, prefix: str) -> Callable:
         """

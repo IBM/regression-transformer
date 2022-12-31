@@ -68,14 +68,6 @@ class DataTrainingArguments:
             "help": "Whether lines of text in the dataset are to be handled as distinct samples."
         },
     )
-
-    mlm: bool = field(
-        default=False, metadata={"help": "Train with masked-LM loss instead of LM"}
-    )
-    mlm_probability: float = field(
-        default=0.15,
-        metadata={"help": "Ratio of tokens to mask for masked language modeling loss"},
-    )
     plm_probability: float = field(
         default=1 / 6,
         metadata={
@@ -124,6 +116,7 @@ def main():
         raise ValueError(
             f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
         )
+    os.makedirs(training_args.output_dir, exist_ok=True)
 
     # Setup logging
     logging.basicConfig(
@@ -142,6 +135,18 @@ def main():
 
     # Set seed
     set_seed(training_args.seed)
+    # Load the training configuration file
+    if training_args.training_config_path is not None:
+        with open(training_args.training_config_path, "r") as f:
+            train_config = json.load(f)
+
+        # Store training config file in model directory
+        with open(
+            os.path.join(training_args.output_dir, "training_configs.json"), "w"
+        ) as f:
+            json.dump(train_config, f, indent="\t")
+    else:
+        train_config = {}
 
     if model_args.config_name:
         with open(model_args.config_name, "r") as f:
@@ -154,6 +159,11 @@ def main():
         )
 
     elif model_args.model_name_or_path:
+        if "checkpoint" not in model_args.model_name_or_path:
+            model_args.model_name_or_path = get_latest_checkpoint(
+                model_args.model_name_or_path,
+                must_contain=train_config.get("checkpoint-str", "best"),
+            )
 
         config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
@@ -165,9 +175,6 @@ def main():
         config = CONFIG_MAPPING[model_args.model_type]()
         model_params = config.__dict__
         logger.warning("You are instantiating a new config instance from scratch.")
-
-    if not os.path.exists(training_args.output_dir):
-        os.makedirs(training_args.output_dir)
 
     if model_args.tokenizer_name:
         tokenizer = ExpressionBertTokenizer.from_pretrained(
@@ -189,7 +196,8 @@ def main():
         # Restore checkpoint if available
         if "checkpoint" not in model_args.model_name_or_path:
             model_args.model_name_or_path = get_latest_checkpoint(
-                model_args.model_name_or_path
+                model_args.model_name_or_path,
+                must_contain=train_config.get("checkpoint-str", "best"),
             )
 
         model = AutoModelWithLMHead.from_pretrained(
@@ -255,18 +263,6 @@ def main():
         warnings.warn(f"Full functionality only with XLNet; not {config.model_type}")
 
     # Set up the training strategy (PLM vs. alternating tasks) + loss function
-    if training_args.training_config_path is not None:
-        with open(training_args.training_config_path, "r") as f:
-            train_config = json.load(f)
-
-        # Store training config file in model directory
-        with open(
-            os.path.join(training_args.output_dir, "training_configs.json"), "w"
-        ) as f:
-            json.dump(train_config, f, indent="\t")
-    else:
-        train_config = {}
-
     if train_config.get("alternate_tasks", False):
         logger.info("Training with alternate tasks")
         # The main collator is the one for property prediction
@@ -281,13 +277,30 @@ def main():
         )
 
     else:
-        logger.info("Training with PLM")
-        # Only vanilla PLM training
-        data_collator = DataCollatorForPermutationLanguageModeling(
-            tokenizer=tokenizer,
-            plm_probability=data_args.plm_probability,
-            max_span_length=data_args.max_span_length,
-        )
+        if train_config["task"] == "proponly":
+            data_collator = TRAIN_COLLATORS["property"](
+                tokenizer=tokenizer,
+                property_tokens=train_config["property_tokens"],
+                num_tokens_to_mask=train_config.get("num_tokens_to_mask", None),
+                mask_token_order=train_config.get("mask_token_order", None),
+            )
+            logger.warning("Training only on property predict")
+        elif train_config["task"] == "gen_only":
+
+            data_collator = TRAIN_COLLATORS[train_config["cg_collator"]](
+                tokenizer=tokenizer, **train_config["cg_collator_params"]
+            )
+            logger.warning("Training ONLY on conditional generation")
+
+        elif train_config["task"] == "plm":
+
+            logger.info("Training with PLM")
+            # Only vanilla PLM training
+            data_collator = DataCollatorForPermutationLanguageModeling(
+                tokenizer=tokenizer,
+                plm_probability=data_args.plm_probability,
+                max_span_length=data_args.max_span_length,
+            )
         alternating_collator = None
 
     custom_trainer_params = get_trainer_dict(model_params)
