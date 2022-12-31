@@ -1,0 +1,20 @@
+{
+    "reset_training_loss": true,
+    "alternate_tasks": true,
+    "cg_collator": "multientity_cg",
+    "cc_loss": true,
+    "property_tokens": [
+        "<yield>"
+    ],
+    "alternate_steps": 50,
+    "cg_collator_params": {
+        "do_sample": false,
+        "property_tokens": [
+            "<yield>"
+        ],
+        "plm_probability": 1.0,
+        "max_span_length": 7,
+        "entity_to_mask": -1,
+        "entity_separator_token": "<energy>"
+    }
+}

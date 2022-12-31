@@ -68,14 +68,6 @@ class DataTrainingArguments:
             "help": "Whether lines of text in the dataset are to be handled as distinct samples."
         },
     )
-
-    mlm: bool = field(
-        default=False, metadata={"help": "Train with masked-LM loss instead of LM"}
-    )
-    mlm_probability: float = field(
-        default=0.15,
-        metadata={"help": "Ratio of tokens to mask for masked language modeling loss"},
-    )
     plm_probability: float = field(
         default=1 / 6,
         metadata={

@@ -145,6 +145,5 @@ dmypy.json
 
 runs
 examples/models
-configs
 bash
 sandbox

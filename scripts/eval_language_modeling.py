@@ -8,27 +8,19 @@ import os
 import sys
 from time import time
 
-import numpy as np
 import pandas as pd
-import torch
 from transformers import (
     AutoConfig,
     AutoModelWithLMHead,
     DataCollatorForPermutationLanguageModeling,
     HfArgumentParser,
-    LineByLineTextDataset,
-    PreTrainedTokenizer,
-    TextDataset,
-    XLNetLMHeadModel,
     set_seed,
 )
 
 from terminator.args import CustomTrainingArguments, EvalArguments
 from terminator.collators import (
     ConditionalGenerationEvaluationCollator,
-    ConditionalGenerationTrainCollator,
     PropertyCollator,
-    SinglePropertyCollator,
 )
 from terminator.datasets import get_dataset
 from terminator.evaluator import Evaluator
