@@ -59,7 +59,7 @@ pip install -e .
 ```
 
 ### Data
-The processed data used to train the models is available via [Box](https://ibm.box.com/s/3xswoewcgpwnk0pkzcupgz67ds2myys2).
+The processed data used to train the models is available via [Box](https://ibm.box.com/s/kijawq3rf4191bbcyflsxx7kp9m74jnx).
 
 ### Training a model
 You can download the data and launch a training by pointing to train and test data:
@@ -90,7 +90,7 @@ python scripts/eval_language_modeling.py --output_dir path_to_model \
 ```
 
 ### Pretrained models
-Pretrained models are available via the GT4SD model hub. There's a total of 9 models that can also be used via [HuggingFace Spaces](https://huggingface.co/spaces/jannisborn/regression_transformer). Models that are part of the publication are also available via the [Box folder mentioned above](https://ibm.box.com/s/3xswoewcgpwnk0pkzcupgz67ds2myys2). 
+Pretrained models are available via the GT4SD model hub. There's a total of 9 models that can also be used via [HuggingFace Spaces](https://huggingface.co/spaces/jannisborn/regression_transformer). Models that are part of the publication are also available via the [Box folder mentioned above](https://ibm.box.com/s/kijawq3rf4191bbcyflsxx7kp9m74jnx). 
 
 #### Generate some data
 To generate custom data for the QED task in a RT-compatible format, run [scripts/generate_example_data.py](./scripts/generate_example_data.py) and point to a `.smi` file with SMILES in the first column.
