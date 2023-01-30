@@ -21,5 +21,11 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     package_data={"terminator": ["py.typed"]},
-    install_requires=["transformers", "numpy", "tqdm", "selfies>=0.2.4<=1.0.0", "modlamp"],
+    install_requires=[
+        "transformers",
+        "numpy",
+        "tqdm",
+        "selfies>=0.2.4,<=1.0.0",
+        "modlamp",
+    ],
 )
