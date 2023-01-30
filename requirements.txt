@@ -3,4 +3,4 @@ torch>=1.7.1
 tqdm
 numpy
 modlamp>=4.3.0
-selfies>=0.2.4<=1.0.0
+selfies>=0.2.4,<=1.0.0
