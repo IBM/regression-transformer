@@ -510,14 +510,14 @@ class ExpressionBertTokenizer(BertTokenizer):
 
     def to_readable(self, sequence: str) -> str:
         """Safely returns a readable string irrespective of whether the language is
-        SMILES, SELFIES or AAS.
+        SMILES, SELFIES, AAS or Polymer.
 
         Args:
-            sequence (str): A string representing a molecule (either SMILES or SELFIES)
-                or amino acid sequence.
+            sequence (str): A string representing a molecule (either SMILES or SELFIES),
+                amino acid sequence or a block copolymer.
 
         Returns:
-            str: A SMILES representing the same molecule.
+            str: A SMILES representing the same molecule or Polymer.
         """
         if self.language == "SMILES":
             return sequence
@@ -526,6 +526,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif self.language == "AAS":
             return sequence
         elif self.language == "REACTION_SMILES":
+            return sequence
+        elif self.language == "Polymer":
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
