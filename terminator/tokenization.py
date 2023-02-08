@@ -372,7 +372,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         for property_expression in splitted_expression[:-1]:
             tokens.extend(self.property_tokenizer.tokenize(property_expression))
             tokens.append(self.expression_separator)
-        tokens.extend(self.text_tokenizer.tokenize(splitted_expression[-1]))
+        if splitted_expression[-1] != "":
+           tokens.extend(self.text_tokenizer.tokenize(splitted_expression[-1]))
         # TODO: remove this hack
         # This is a hack to get around DataCollatorForLanguageModeling requiring even
         # length sequences
