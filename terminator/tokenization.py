@@ -190,12 +190,52 @@ class PolymerGraphTokenizer:
             extracted tokens.
         """
         tokens = []
-        for node in self.tokenizer.tokenize(text):
-            for block in node.split("->"):
+        text = self.inference_fixer(text)
+
+        chunks = self.tokenizer.tokenize(text)
+        if text == "<>":
+            chunks = ["<>"]
+        for i, node in enumerate(chunks):
+            for j, block in enumerate(node.split("->")):
                 tokens.extend(self.node_tokenizer.tokenize(block))
+                if i == 0 and j == 0 and self.prefix:
+                    # Remove the token added for compatibility
+                    tokens = tokens[1:]
                 tokens.append("->")
             del tokens[-1]
+        if self.postfix:
+            # Remove the token added for compatibility
+            del tokens[-1]
+
+        if tokens == []:
+            logger.error(f"Tokenizing {text} yielded []")
         return tokens
+
+    def inference_fixer(self, text: str) -> str:
+        """
+        If used at inference time, this method ensures that not both
+            ">" and "<" have to be present in the text.
+
+        Args:
+            text: Text to tokenized
+
+
+        Returns:
+            Fixed text, tokenizable by tokenizer
+        """
+        if text.startswith("<") and (text.endswith(">") and not text.endswith("->")):
+            # Sane, full sequence as provided in training
+            self.prefix, self.postfix = False, False
+            return text
+        elif text.startswith("<"):
+            self.prefix, self.postfix = False, True
+            return text + ">"
+        elif text.endswith(">") and not text.endswith("->"):
+            self.prefix, self.postfix = True, False
+            return "<" + text
+        else:
+            self.prefix, self.postfix = True, True
+            return "<" + text + ">"
 
 
 class ExpressionTokenizer:
@@ -372,7 +412,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         for property_expression in splitted_expression[:-1]:
             tokens.extend(self.property_tokenizer.tokenize(property_expression))
             tokens.append(self.expression_separator)
-        tokens.extend(self.text_tokenizer.tokenize(splitted_expression[-1]))
+        if splitted_expression[-1] != "":
+            tokens.extend(self.text_tokenizer.tokenize(splitted_expression[-1]))
         # TODO: remove this hack
         # This is a hack to get around DataCollatorForLanguageModeling requiring even
         # length sequences
@@ -635,12 +676,15 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
             text = text[1:]
             tokens.append(self.expression_separator)
         if text.startswith("<") and text.endswith(">"):
-            prop_tokens = re.compile(r"\s*(<\w+>)\s").split(text)
+            if not (
+                ";" in text and isinstance(self.text_tokenizer, PolymerGraphTokenizer)
+            ):
+                prop_tokens = re.compile(r"\s*(<\w+>)\s").split(text)
 
-            if len(prop_tokens) != 1:
-                raise ValueError(f"Problem in processing {text}: ({prop_tokens})")
-            tokens.extend(prop_tokens)
-            return tokens
+                if len(prop_tokens) != 1:
+                    raise ValueError(f"Problem in processing {text}: ({prop_tokens})")
+                tokens.extend(prop_tokens)
+                return tokens
         tokens.extend(super()._tokenize(text))
         return tokens
 
