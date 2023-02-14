@@ -5,7 +5,7 @@ from transformers import XLNetTokenizer
 
 
 def parse_humicroedit(
-    dataset, expression_separator: str = '{', expression_end: str = '}'
+    dataset, expression_separator: str = "{", expression_end: str = "}"
 ) -> List[str]:
     """
     Parse the humicrocredit dataset in an appropriate format.
