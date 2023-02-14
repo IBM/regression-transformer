@@ -399,9 +399,9 @@ class XLNetRTTokenizer(XLNetTokenizer):
     def set_property_tokenizer(
         self,
         tokenizer: PropertyTokenizer,
-        expression_separator: str = '{',
-        expression_end: str = '}',
-        property_token: str = '[funny]',
+        expression_separator: str = "{",
+        expression_end: str = "}",
+        property_token: str = "[funny]",
     ):
         """
         Set the property tokenizer to be used by the main tokenizer.

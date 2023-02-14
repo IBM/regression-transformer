@@ -1,5 +1,7 @@
 # Regression Transformer
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Gradio demo](https://img.shields.io/website-up-down-green-red/https/hf.space/gradioiframe/GT4SD/regression_transformer/+.svg?label=demo%20status)](https://huggingface.co/spaces/GT4SD/regression_transformer)
 
 A multitask Transformer that reformulates regression as a conditional sequence modeling task.
 This yields a dichotomous language model that seamlessly integrates regression with property-driven conditional generation.
@@ -9,7 +11,7 @@ This yields a dichotomous language model that seamlessly integrates regression w
 This repo contains the development code.
 
 ## Demo with UI
-🤗 A gradio demo with a simple UI is available at: https://huggingface.co/spaces/jannisborn/regression_transformer
+🤗 A gradio demo with a simple UI is available on [HuggingFace spaces](https://huggingface.co/spaces/GT4SD/regression_transformer)
 ![Summary](assets/gradio_demo.png)
 
 
@@ -123,10 +125,10 @@ At this point the folder containing the vocabulary file can be used to load a to
 If you use the regression transformer, please cite:
 ```bib
 @article{born2022regression,
-  title={Regression Transformer: Concurrent Conditional Generation and Regression by Blending Numerical and Textual Tokens},
+  title={Regression Transformer enables concurrent sequence regression and generation for molecular language modeling},
   author={Born, Jannis and Manica, Matteo},
-  journal={arXiv preprint arXiv:2202.01338},
-  note={Spotlight talk at ICLR workshop on Machine Learning for Drug Discovery},
-  year={2022}
+  journal={Nature Machine Intelligence},
+  note={Article in press. arXiv preprint arXiv:2202.01338},
+  year={2023}
 }
 ```

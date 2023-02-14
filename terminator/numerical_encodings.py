@@ -40,7 +40,7 @@ def get_float_encoding(
     else:
         digit = int(token[1])
         order = int(token.split("_")[-2])
-        val = digit * 10 ** order
+        val = digit * 10**order
 
     for i in range(0, embedding_size, 2):
         vals[i] = val / (i + 1)
@@ -72,7 +72,7 @@ def get_int_encoding(token: str, embedding_size: int) -> torch.Tensor:
     else:
         digit = int(token[1])
         order = int(token.split("_")[-2])
-        val = digit * 10 ** order
+        val = digit * 10**order
 
         if order < 0:
             raise ValueError(
