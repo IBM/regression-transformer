@@ -2,6 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Gradio demo](https://img.shields.io/website-up-down-green-red/https/hf.space/gradioiframe/GT4SD/regression_transformer/+.svg?label=demo%20status)](https://huggingface.co/spaces/GT4SD/regression_transformer)
+[![DOI](https://zenodo.org/badge/449377638.svg)](https://zenodo.org/badge/latestdoi/449377638)
 
 A multitask Transformer that reformulates regression as a conditional sequence modeling task.
 This yields a dichotomous language model that seamlessly integrates regression with property-driven conditional generation.
