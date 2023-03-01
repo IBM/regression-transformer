@@ -26,6 +26,11 @@ A complete tutorial of running inference, finetuning a RT model (or training it 
 
 For example, via GT4SD you can use the RT pretrained on small molecules with some properties as shown in the paper, in particular [QED](https://www.nature.com/articles/nchem.1243) and [ESOL](https://pubs.acs.org/doi/10.1021/ci034243x) (water solubility). There is also several multiproperty variants of the RT: e.g., a model trained jointly on logP and synthesizability (aka [SCScore](https://pubs.acs.org/doi/10.1021/acs.jcim.7b00622)).
 For protein language modeling, you will also find a RT trained on a [peptide stability](https://www.science.org/doi/full/10.1126/science.aan0693) dataset from the [TAPE](https://github.com/songlab-cal/tape) benchmark.
+In sum, GT4SD provides RT models pretrained on:
+- **small molecules**: single (`qed`, `esol`, `crippen_logp`) or multiple (`logp_and_synthesizability`, `cosmo_acdl`, `pfas`) properties. All those models use SELFIES apart from `crippen_logp` which uses SMILES.
+- **proteins**: `stability`
+- **chemical reactions**: `uspto` (using reaction SMILES)
+- **polymers**: `rop_catalyst` and `block_copolymer`, both described in [Park et al., (2022; ChemRxiv)](https://chemrxiv.org/engage/chemrxiv/article-details/62b60865e84dd185e60214af). The `block_copolymer` model uses the CMDL described in [Park et al., (2022; ChemRxiv)](https://chemrxiv.org/engage/chemrxiv/article-details/62b60865e84dd185e60214af). 
 
 A jupyter notebook with a toy usecase on adapting a molecule toward solubility is provided in [GT4SD](https://github.com/GT4SD/gt4sd-core/blob/main/notebooks/regression-transformer-demo.ipynb) too.
 If you use [GT4SD](https://github.com/GT4SD/gt4sd-core), you can generate molecules like this:
