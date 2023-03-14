@@ -1,21 +1,22 @@
 """Tokenization utilties for exrepssions."""
+import copy
+import json
 import logging
+import os
 import re
 import sys
-from typing import Dict, List, Tuple, Set
-import os
-import json
-import copy
-import torch
-import transformers
-from .selfies import decoder
-from transformers import BertTokenizer
+from typing import Dict, List, Set, Tuple
+
 from tokenizers import AddedToken
+from transformers import BertTokenizer
+
+from .selfies import decoder
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
+PSMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\[\*\]|\$|\%[0-9]{2}|[0-9])"
 POLYMER_GRAPH_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|A|B|C|D|E|R|Q|Z|;|<|>|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 
 
@@ -240,7 +241,10 @@ class PolymerGraphTokenizer:
 
 class ExpressionTokenizer:
     def __init__(
-        self, expression_tokenizer: str = "|", language: str = "SMILES"
+        self,
+        expression_tokenizer: str = "|",
+        language: str = "SMILES",
+        precursor_separator: str = "<energy>",
     ) -> None:
         """Constructs an expression tokenizer.
 
@@ -248,7 +252,9 @@ class ExpressionTokenizer:
             expression_tokenizer (str): Token separating the property. Defaults to '|'.
                 Must not occur in the language itself.
             language (str): Identifier for the (chemical) language. Should be either
-                'SMILES', 'SELFIES' or 'AAS'.
+                'SMILES', 'SELFIES' or 'AAS', 'REACTION_SMILES' or 'Polymer'.
+            precursor_separator (str): a token that separates different precursors from
+                another. Used only for REACTION_SMILES sequences. Defaults to '<energy>'.
         """
         self.language = language
         if language == "SMILES":
@@ -258,12 +264,19 @@ class ExpressionTokenizer:
         elif language == "AAS":
             self.text_tokenizer = CharacterTokenizer()
         elif language == "REACTION_SMILES":
-            self.text_tokenizer = PolymerGraphTokenizer()
+            self.text_tokenizer = ReactionSmilesTokenizer(
+                precursor_separator=precursor_separator
+            )
+            self.presep = precursor_separator
         elif language == "Polymer":
-            self.text_tokenizer = CharacterTokenizer()
+            self.text_tokenizer = PolymerGraphTokenizer()
+        elif language == "PSMILES":
+            self.text_tokenizer = RegexTokenizer(
+                regex_pattern=PSMILES_TOKENIZER_PATTERN
+            )
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES'"
             )
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = expression_tokenizer
@@ -308,7 +321,7 @@ class ExpressionBertTokenizer(BertTokenizer):
         precursor_separator: str = "<energy>",
         **kwargs,
     ) -> None:
-        """Constructs an ExpressionTokenizer.
+        """Constructs an ExpressionBertTokenizer.
 
         Args:
             vocab_file: vocabulary file containing tokens.
@@ -322,8 +335,8 @@ class ExpressionBertTokenizer(BertTokenizer):
                 True.
             language (str): Identifier for the (chemical) language. Should be either
                 'SMILES', 'SELFIES' or 'AAS', 'REACTION_SMILES' or 'Polymer'.
-            precursor_separator: a token that separates different precursors from
-                another. Used only for REACTION sequences. Defaults to '<energy>'.
+            precursor_separator (str): a token that separates different precursors from
+                another. Used only for REACTION_SMILES sequences. Defaults to '<energy>'.
         """
         super().__init__(
             vocab_file=vocab_file,
@@ -351,9 +364,13 @@ class ExpressionBertTokenizer(BertTokenizer):
             self.presep = precursor_separator
         elif language == "Polymer":
             self.text_tokenizer = PolymerGraphTokenizer()
+        elif language == "PSMILES":
+            self.text_tokenizer = RegexTokenizer(
+                regex_pattern=PSMILES_TOKENIZER_PATTERN
+            )
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES'"
             )
 
         self.property_tokenizer = PropertyTokenizer()
@@ -569,6 +586,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif self.language == "REACTION_SMILES":
             return sequence
         elif self.language == "Polymer":
+            return sequence
+        elif self.language == "PSMILES":
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")

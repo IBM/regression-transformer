@@ -16,7 +16,7 @@ from transformers import DataCollatorForPermutationLanguageModeling
 from transformers.utils import logging
 
 from terminator.collators import PropertyCollator
-from terminator.search import GreedySearch, SamplingSearch, BeamSearch
+from terminator.search import BeamSearch, GreedySearch, SamplingSearch
 from terminator.trainer import CustomTrainer
 from terminator.utils import find_safe_path
 
@@ -171,7 +171,6 @@ class Evaluator(CustomTrainer):
         """
 
         eval_dataloader = self.get_custom_dataloader(collator)
-
 
         for prop in collator.property_tokens:
 
