@@ -17,6 +17,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 PSMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\[\*\]|\$|\%[0-9]{2}|[0-9])"
+BIGSMILES_TOKENIZER_PATTERN = r"(\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\(|\)|\.|\,|\{|\}|\[\]|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 POLYMER_GRAPH_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|A|B|C|D|E|R|Q|Z|;|<|>|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
 
 
@@ -274,9 +275,13 @@ class ExpressionTokenizer:
             self.text_tokenizer = RegexTokenizer(
                 regex_pattern=PSMILES_TOKENIZER_PATTERN
             )
+        elif language == "BigSMILES":
+            self.text_tokenizer = RegexTokenizer(
+                regex_pattern=BIGSMILES_TOKENIZER_PATTERN
+            )
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES'"
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer', 'PSMILES' or 'BigSMILES'."
             )
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = expression_tokenizer
@@ -367,6 +372,10 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif language == "PSMILES":
             self.text_tokenizer = RegexTokenizer(
                 regex_pattern=PSMILES_TOKENIZER_PATTERN
+            )
+        elif language == "BigSMILES":
+            self.text_tokenizer = RegexTokenizer(
+                regex_pattern=BIGSMILES_TOKENIZER_PATTERN
             )
         else:
             raise ValueError(
@@ -588,6 +597,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif self.language == "Polymer":
             return sequence
         elif self.language == "PSMILES":
+            return sequence
+        elif self.language == "BigSMILES":
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
