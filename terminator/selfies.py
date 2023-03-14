@@ -13,36 +13,36 @@ RING_TYPE = 3
 
 
 default_bond_constraints = {
-    'H': 1,
-    'F': 1,
-    'Cl': 1,
-    'Br': 1,
-    'I': 1,
-    'O': 2,
-    'O+1': 3,
-    'O-1': 1,
-    'N': 3,
-    'N+1': 4,
-    'N-1': 2,
-    'C': 4,
-    'C+1': 5,
-    'C-1': 3,
-    'P': 5,
-    'P+1': 6,
-    'P-1': 4,
-    'S': 6,
-    'S+1': 7,
-    'S-1': 5,
-    '?': 8,
+    "H": 1,
+    "F": 1,
+    "Cl": 1,
+    "Br": 1,
+    "I": 1,
+    "O": 2,
+    "O+1": 3,
+    "O-1": 1,
+    "N": 3,
+    "N+1": 4,
+    "N-1": 2,
+    "C": 4,
+    "C+1": 5,
+    "C-1": 3,
+    "P": 5,
+    "P+1": 6,
+    "P-1": 4,
+    "S": 6,
+    "S+1": 7,
+    "S-1": 5,
+    "?": 8,
 }
 
 octet_rule_bond_constraints = dict(default_bond_constraints)
 octet_rule_bond_constraints.update(
-    {'S': 2, 'S+1': 3, 'S-1': 1, 'P': 3, 'P+1': 4, 'P-1': 2}
+    {"S": 2, "S+1": 3, "S-1": 1, "P": 3, "P+1": 4, "P-1": 2}
 )
 
 hypervalent_bond_constraints = dict(default_bond_constraints)
-hypervalent_bond_constraints.update({'Cl': 7, 'Br': 7, 'I': 7, 'N': 5})
+hypervalent_bond_constraints.update({"Cl": 7, "Br": 7, "I": 7, "N": 5})
 
 _bond_constraints = default_bond_constraints
 
@@ -57,13 +57,13 @@ def get_semantic_robust_alphabet() -> Set[str]:
 
     alphabet_subset = set()
 
-    organic_subset = {'B', 'C', 'N', 'O', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
-    bonds = {'': 1, '=': 2, '#': 3}
+    organic_subset = {"B", "C", "N", "O", "S", "P", "F", "Cl", "Br", "I"}
+    bonds = {"": 1, "=": 2, "#": 3}
 
     # add atomic symbols
     for (a, c), (b, m) in product(_bond_constraints.items(), bonds.items()):
 
-        if (m > c) or (a == '?'):
+        if (m > c) or (a == "?"):
             continue
 
         if a in organic_subset:
@@ -170,7 +170,7 @@ def set_semantic_constraints(bond_constraints: Optional[Dict[str, int]] = None) 
     else:
 
         # error checking
-        if '?' not in bond_constraints:
+        if "?" not in bond_constraints:
             raise ValueError("bond_constraints missing '?' as a key.")
 
         for key, value in bond_constraints.items():
@@ -197,16 +197,16 @@ def get_next_state(symbol: str, state: int) -> Tuple[str, int]:
         (2) the next derivation state.
     """
 
-    if symbol == '[epsilon]':
-        return ('', 0) if state == 0 else ('', -1)
+    if symbol == "[epsilon]":
+        return ("", 0) if state == 0 else ("", -1)
 
     # convert to smiles symbol
-    bond = ''
-    if symbol[1] in {'/', '\\', '=', '#'}:
+    bond = ""
+    if symbol[1] in {"/", "\\", "=", "#"}:
         bond = symbol[1]
     bond_num = get_num_from_bond(bond)
 
-    if symbol[-5:] == 'expl]':  # e.g. [C@@Hexpl]
+    if symbol[-5:] == "expl]":  # e.g. [C@@Hexpl]
         smiles_symbol = "[{}]".format(symbol[1 + len(bond) : -5])
     else:
         smiles_symbol = symbol[1 + len(bond) : -1]
@@ -219,7 +219,7 @@ def get_next_state(symbol: str, state: int) -> Tuple[str, int]:
     else:
         atom_or_ion = "{}{:+}".format(element, charge)
 
-    max_bonds = _bond_constraints.get(atom_or_ion, _bond_constraints['?'])
+    max_bonds = _bond_constraints.get(atom_or_ion, _bond_constraints["?"])
 
     if (h_count > max_bonds) or (h_count == max_bonds and state > 0):
         raise ValueError(
@@ -230,7 +230,7 @@ def get_next_state(symbol: str, state: int) -> Tuple[str, int]:
 
     # calculate next state
     if state == 0:
-        bond = ''
+        bond = ""
         next_state = max_bonds
     else:
         if bond_num > min(state, max_bonds):
@@ -275,22 +275,22 @@ def get_next_branch_state(branch_symbol: str, state: int) -> Tuple[int, int]:
 # SELFIES Symbol to N Functions ============================================
 
 _index_alphabet = [
-    '[C]',
-    '[Ring1]',
-    '[Ring2]',
-    '[Branch1_1]',
-    '[Branch1_2]',
-    '[Branch1_3]',
-    '[Branch2_1]',
-    '[Branch2_2]',
-    '[Branch2_3]',
-    '[O]',
-    '[N]',
-    '[=N]',
-    '[=C]',
-    '[#C]',
-    '[S]',
-    '[P]',
+    "[C]",
+    "[Ring1]",
+    "[Ring2]",
+    "[Branch1_1]",
+    "[Branch1_2]",
+    "[Branch1_3]",
+    "[Branch2_1]",
+    "[Branch2_2]",
+    "[Branch2_3]",
+    "[O]",
+    "[N]",
+    "[=N]",
+    "[=C]",
+    "[#C]",
+    "[S]",
+    "[P]",
 ]
 
 # _alphabet_code takes as a key a SELFIES symbol, and its corresponding value
@@ -362,7 +362,7 @@ def get_bond_from_num(n: int) -> str:
     :return: the SMILES symbol representing a bond with multiplicity ``n``.
     """
 
-    return ('', '=', '#')[n - 1]
+    return ("", "=", "#")[n - 1]
 
 
 def find_element(atom_symbol: str) -> Tuple[int, int]:
@@ -378,14 +378,14 @@ def find_element(atom_symbol: str) -> Tuple[int, int]:
         ``atom_symbol``.
     """
 
-    if atom_symbol[0] != '[':
+    if atom_symbol[0] != "[":
         return 0, len(atom_symbol)
 
     i = 1
     while atom_symbol[i].isdigit():  # skip isotope number
         i += 1
 
-    if atom_symbol[i + 1].isalpha() and atom_symbol[i + 1] != 'H':
+    if atom_symbol[i + 1].isalpha() and atom_symbol[i + 1] != "H":
         return i, i + 2
     else:
         return i, i + 1
@@ -402,20 +402,20 @@ def parse_atom_symbol(atom_symbol: str) -> Tuple[str, int, int]:
         count, and (3) the charge.
     """
 
-    if atom_symbol[0] != '[':
+    if atom_symbol[0] != "[":
         return atom_symbol, 0, 0
 
     atom_start, atom_end = find_element(atom_symbol)
     i = atom_end
 
     # skip chirality
-    if atom_symbol[i] == '@':  # e.g. @
+    if atom_symbol[i] == "@":  # e.g. @
         i += 1
-    if atom_symbol[i] == '@':  # e.g. @@
+    if atom_symbol[i] == "@":  # e.g. @@
         i += 1
 
     h_count = 0  # hydrogen count
-    if atom_symbol[i] == 'H':
+    if atom_symbol[i] == "H":
         h_count = 1
 
         i += 1
@@ -424,13 +424,13 @@ def parse_atom_symbol(atom_symbol: str) -> Tuple[str, int, int]:
             i += 1
 
     charge = 0  # charge count
-    if atom_symbol[i] in ('+', '-'):
-        charge = 1 if atom_symbol[i] == '+' else -1
+    if atom_symbol[i] in ("+", "-"):
+        charge = 1 if atom_symbol[i] == "+" else -1
 
         i += 1
-        if atom_symbol[i] in ('+', '-'):  # e.g. [Cu++]
-            while atom_symbol[i] in ('+', '-'):
-                charge += 1 if atom_symbol[i] == '+' else -1
+        if atom_symbol[i] in ("+", "-"):  # e.g. [Cu++]
+            while atom_symbol[i] in ("+", "-"):
+                charge += 1 if atom_symbol[i] == "+" else -1
                 i += 1
 
         elif atom_symbol[i].isdigit():  # e.g. [Cu+2]
@@ -506,7 +506,7 @@ def _build_molecular_graph(
             prev_idx = curr_idx
 
         elif symbol_type == BRANCH_TYPE:
-            if symbol == '(':
+            if symbol == "(":
                 curr_idx = _build_molecular_graph(
                     graph, smiles_symbols, rings, prev_idx, curr_idx
                 )
@@ -522,12 +522,12 @@ def _build_molecular_graph(
                 # can faithfully represent the bond to be localized at
                 # one index. For example, C=1CCCC=1 --> C1CCCC=1.
 
-                if smiles_symbols[left_bond_idx][0] != '':
+                if smiles_symbols[left_bond_idx][0] != "":
                     bond_idx = left_bond_idx
-                    smiles_symbols[right_bond_idx][0] = ''
+                    smiles_symbols[right_bond_idx][0] = ""
                 else:
                     bond_idx = right_bond_idx
-                    smiles_symbols[left_bond_idx][0] = ''
+                    smiles_symbols[left_bond_idx][0] = ""
 
                 graph.add_bond(left_idx, right_idx, bond_idx)
             else:
@@ -558,17 +558,17 @@ def _kekulize(mol_graph) -> None:
 # key = aromatic SMILES element, value = number of valence electrons
 # Note: wild card '*' not supported currently
 _aromatic_valences = {
-    'b': 3,
-    'al': 3,
-    'c': 4,
-    'si': 4,
-    'n': 5,
-    'p': 5,
-    'as': 5,
-    'o': 6,
-    's': 6,
-    'se': 6,
-    'te': 6,
+    "b": 3,
+    "al": 3,
+    "c": 4,
+    "si": 4,
+    "n": 5,
+    "p": 5,
+    "as": 5,
+    "o": 6,
+    "s": 6,
+    "se": 6,
+    "te": 6,
 }
 
 
@@ -630,10 +630,10 @@ def _in_pi_subgraph(atom_symbol: str, bonds: Tuple[str]) -> bool:
     # this also covers the neutral carbon radical case (e.g. C1=[C]NC=C1),
     # which is treated equivalently to a 1-H carbon (e.g. C1=[CH]NC=C1)
     if (
-        (atom == 'c')
+        (atom == "c")
         and (h_count == charge == 0)
         and (len(bonds) == 2)
-        and ('#' not in bonds)
+        and ("#" not in bonds)
     ):
 
         h_count += 1  # implied bonded hydrogen
@@ -755,13 +755,13 @@ class MolecularGraph:
         if atom_b_aro:
             self.aro_indices.add(idx_b)
 
-        if bond_symbol == ':':
+        if bond_symbol == ":":
             self.aro_indices.add(idx_a)
             self.aro_indices.add(idx_b)
 
             # Note: ':' bonds are edited here to ''
-            self.set_bond_symbol('', bond_idx)
-            bond_symbol = ''
+            self.set_bond_symbol("", bond_idx)
+            bond_symbol = ""
 
         edge = Bond(idx_a, idx_b, bond_symbol, bond_idx)
 
@@ -798,7 +798,7 @@ class MolecularGraph:
                 filter(
                     lambda e: (e.idx_a in self.graph)
                     and (e.idx_b in self.graph)
-                    and (e.bond_symbol == ''),
+                    and (e.bond_symbol == ""),
                     edges,
                 )
             )
@@ -864,12 +864,12 @@ class MolecularGraph:
                 )
 
                 if success:
-                    e.bond_symbol = '='
+                    e.bond_symbol = "="
                     return True
                 else:  # the matching failed, so we must backtrack
 
                     for edge in matched_edges - matched_edges_save:
-                        edge.bond_symbol = ''
+                        edge.bond_symbol = ""
                         matched_nodes.discard(edge.idx_a)
                         matched_nodes.discard(edge.idx_b)
 
@@ -987,9 +987,9 @@ def decoder(
     old_constraints = get_semantic_constraints()
     if constraints is None:
         pass
-    elif constraints == 'octet_rule':
+    elif constraints == "octet_rule":
         set_semantic_constraints(get_octet_rule_constraints())
-    elif constraints == 'hypervalent':
+    elif constraints == "hypervalent":
         set_semantic_constraints(get_hypervalent_constraints())
     else:
         raise ValueError("unrecognized constraint type")
@@ -1006,7 +1006,7 @@ def decoder(
         if constraints is not None:  # restore old constraints
             set_semantic_constraints(old_constraints)
 
-        return '.'.join(all_smiles)
+        return ".".join(all_smiles)
 
     except ValueError as err:
         if constraints is not None:  # restore old constraints
@@ -1027,22 +1027,22 @@ def _parse_selfies(selfies: str) -> Iterable[str]:
     :return: an iterable of the symbols of the SELFIES.
     """
 
-    left_idx = selfies.find('[')
+    left_idx = selfies.find("[")
 
     while 0 <= left_idx < len(selfies):
-        right_idx = selfies.find(']', left_idx + 1)
+        right_idx = selfies.find("]", left_idx + 1)
 
-        if (selfies[left_idx] != '[') or (right_idx == -1):
+        if (selfies[left_idx] != "[") or (right_idx == -1):
             raise ValueError("malformed SELIFES, " "misplaced or missing brackets")
 
         next_symbol = selfies[left_idx : right_idx + 1]
         left_idx = right_idx + 1
 
-        if next_symbol != '[nop]':  # skip [nop]
+        if next_symbol != "[nop]":  # skip [nop]
             yield next_symbol
 
     while True:  # no more symbols left
-        yield ''
+        yield ""
 
 
 def _parse_selfies_symbols(selfies_symbols: List[str]) -> Iterable[str]:
@@ -1053,11 +1053,11 @@ def _parse_selfies_symbols(selfies_symbols: List[str]) -> Iterable[str]:
     """
     for symbol in selfies_symbols:
 
-        if symbol != '[nop]':
+        if symbol != "[nop]":
             yield symbol
 
     while True:
-        yield ''
+        yield ""
 
 
 def _translate_selfies(selfies: str) -> str:
@@ -1098,8 +1098,8 @@ def _translate_selfies(selfies: str) -> str:
 
     # create branches
     for lb, rb in branches.items():
-        derived[lb][0] = '(' + derived[lb][0]
-        derived[rb][0] += ')'
+        derived[lb][0] = "(" + derived[lb][0]
+        derived[rb][0] += ")"
 
     smiles = ""
     for s, _, _ in derived:  # construct SMILES from <derived>
@@ -1136,10 +1136,10 @@ def _translate_selfies_derive(
     curr_symbol = next(selfies_gen)
     state = init_state
 
-    while curr_symbol != '' and state >= 0:
+    while curr_symbol != "" and state >= 0:
 
         # Case 1: Branch symbol (e.g. [Branch1_2])
-        if 'Branch' in curr_symbol:
+        if "Branch" in curr_symbol:
 
             branch_init_state, new_state = get_next_branch_state(curr_symbol, state)
 
@@ -1174,7 +1174,7 @@ def _translate_selfies_derive(
                     branches[branch_start] = branch_end
 
         # Case 2: Ring symbol (e.g. [Ring2])
-        elif 'Ring' in curr_symbol:
+        elif "Ring" in curr_symbol:
 
             new_state = state
 
@@ -1192,8 +1192,8 @@ def _translate_selfies_derive(
                 left_idx = max(0, prev_idx - (N + 1))
                 right_idx = prev_idx
 
-                bond_symbol = ''
-                if curr_symbol[1:5] == 'Expl':
+                bond_symbol = ""
+                if curr_symbol[1:5] == "Expl":
                     bond_symbol = curr_symbol[5]
 
                 rings.append((left_idx, right_idx, bond_symbol))
@@ -1202,7 +1202,7 @@ def _translate_selfies_derive(
         else:
             new_symbol, new_state = get_next_state(curr_symbol, state)
 
-            if new_symbol != '':  # in case of [epsilon]
+            if new_symbol != "":  # in case of [epsilon]
                 derived.append([new_symbol, new_state, prev_idx])
 
                 if prev_idx >= 0:
@@ -1252,10 +1252,10 @@ def _form_rings_bilocally(
 
             right_symbol = right_end[0]
 
-            if right_symbol[0] in {'-', '/', '\\', '=', '#'}:
+            if right_symbol[0] in {"-", "/", "\\", "=", "#"}:
                 old_bond = right_symbol[0]
             else:
-                old_bond = ''
+                old_bond = ""
 
             # update bond multiplicity and symbol
             new_bond_num = min(bond_num + get_num_from_bond(old_bond), 3)
@@ -1372,13 +1372,13 @@ def encoder(smiles: str, print_error: bool = False) -> Optional[str]:
     """
 
     try:
-        if '*' in smiles:
+        if "*" in smiles:
             raise ValueError("wildcard atom '*' not supported")
 
         all_selfies = []  # process dot-separated fragments separately
         for s in smiles.split("."):
             all_selfies.append(_translate_smiles(s))
-        return '.'.join(all_selfies)
+        return ".".join(all_selfies)
 
     except ValueError as err:
         if print_error:
@@ -1396,7 +1396,7 @@ def _translate_smiles(smiles: str) -> str:
     smiles_gen = _parse_smiles(smiles)
 
     char_set = set(smiles)
-    if any(c in char_set for c in ['c', 'n', 'o', 'p', 'a', 's']):
+    if any(c in char_set for c in ["c", "n", "o", "p", "a", "s"]):
         smiles_gen = kekulize_parser(smiles_gen)
 
     # a simple mutable counter to track which atom was the i-th derived atom
@@ -1438,14 +1438,14 @@ def _parse_smiles(smiles: str) -> Iterable[Tuple[str, str, int]]:
 
     while 0 <= i < len(smiles):
 
-        bond = ''
+        bond = ""
 
-        if smiles[i] in {'-', '/', '\\', '=', '#', ":"}:
+        if smiles[i] in {"-", "/", "\\", "=", "#", ":"}:
             bond = smiles[i]
             i += 1
 
         if smiles[i].isalpha():  # organic subset elements
-            if smiles[i : i + 2] in ('Br', 'Cl'):  # two letter elements
+            if smiles[i : i + 2] in ("Br", "Cl"):  # two letter elements
                 symbol = smiles[i : i + 2]
                 symbol_type = ATOM_TYPE
                 i += 2
@@ -1454,14 +1454,14 @@ def _parse_smiles(smiles: str) -> Iterable[Tuple[str, str, int]]:
                 symbol_type = ATOM_TYPE
                 i += 1
 
-        elif smiles[i] in ('(', ')'):  # open and closed branch brackets
+        elif smiles[i] in ("(", ")"):  # open and closed branch brackets
             bond = smiles[i + 1 : i + 2]
             symbol = smiles[i]
             symbol_type = BRANCH_TYPE
             i += 1
 
-        elif smiles[i] == '[':  # atoms encased in brackets (e.g. [NH])
-            r_idx = smiles.find(']', i + 1)
+        elif smiles[i] == "[":  # atoms encased in brackets (e.g. [NH])
+            r_idx = smiles.find("]", i + 1)
             symbol = smiles[i : r_idx + 1]
             symbol_type = ATOM_TYPE
             i = r_idx + 1
@@ -1470,8 +1470,8 @@ def _parse_smiles(smiles: str) -> Iterable[Tuple[str, str, int]]:
                 raise ValueError("malformed SMILES, missing ']'")
 
             # quick chirality specification check
-            chiral_i = symbol.find('@')
-            if symbol[chiral_i + 1].isalpha() and symbol[chiral_i + 1] != 'H':
+            chiral_i = symbol.find("@")
+            if symbol[chiral_i + 1].isalpha() and symbol[chiral_i + 1] != "H":
                 raise ValueError(
                     "chiral specification '{}' not supported".format(symbol)
                 )
@@ -1481,7 +1481,7 @@ def _parse_smiles(smiles: str) -> Iterable[Tuple[str, str, int]]:
             symbol_type = RING_TYPE
             i += 1
 
-        elif smiles[i] == '%':  # two-digit ring number (e.g. %12)
+        elif smiles[i] == "%":  # two-digit ring number (e.g. %12)
             symbol = smiles[i + 1 : i + 3]
             symbol_type = RING_TYPE
             i += 3
@@ -1514,11 +1514,11 @@ def _translate_smiles_derive(
 
     for bond, symbol, symbol_type in smiles_gen:
 
-        if bond == '-':  # ignore explicit single bonds
-            bond = ''
+        if bond == "-":  # ignore explicit single bonds
+            bond = ""
 
         if symbol_type == ATOM_TYPE:
-            if symbol[0] == '[':
+            if symbol[0] == "[":
                 selfies += "[{}{}expl]".format(bond, symbol[1:-1])
             else:
                 selfies += "[{}{}]".format(bond, symbol)
@@ -1527,7 +1527,7 @@ def _translate_smiles_derive(
             selfies_len += 1
 
         elif symbol_type == BRANCH_TYPE:
-            if symbol == '(':
+            if symbol == "(":
 
                 # NOTE: looping inside a loop on a generator will produce
                 # expected behaviour in this case.
@@ -1540,7 +1540,7 @@ def _translate_smiles_derive(
                 bond_num = get_num_from_bond(bond)
 
                 selfies += "[Branch{}_{}]".format(len(N_as_symbols), bond_num)
-                selfies += ''.join(N_as_symbols) + branch
+                selfies += "".join(N_as_symbols) + branch
                 selfies_len += 1 + len(N_as_symbols) + branch_len
 
             else:  # symbol == ')'
@@ -1556,14 +1556,14 @@ def _translate_smiles_derive(
                 ring_len = right_end - left_end
                 N_as_symbols = get_symbols_from_n(ring_len - 1)
 
-                if left_bond != '':
+                if left_bond != "":
                     selfies += "[Expl{}Ring{}]".format(left_bond, len(N_as_symbols))
-                elif right_bond != '':
+                elif right_bond != "":
                     selfies += "[Expl{}Ring{}]".format(right_bond, len(N_as_symbols))
                 else:
                     selfies += "[Ring{}]".format(len(N_as_symbols))
 
-                selfies += ''.join(N_as_symbols)
+                selfies += "".join(N_as_symbols)
                 selfies_len += 1 + len(N_as_symbols)
 
             else:

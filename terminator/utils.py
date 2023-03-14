@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-import transformers
+
 import numpy as np
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
@@ -41,7 +41,9 @@ def get_latest_checkpoint(model_path: str, must_contain: str = "best") -> str:
         checkpoints = list(filter(lambda x: must_contain in x, checkpoints))
 
     if len(checkpoints) == 0:
-        logger.warning(f"No checkpoints found that contain {must_contain} in {model_path}.")
+        logger.warning(
+            f"No checkpoints found that contain {must_contain} in {model_path}."
+        )
         # Relax criteria and retry
         next_try = "checkpoint" if must_contain != "checkpoint" else ""
         return get_latest_checkpoint(model_path, must_contain=next_try)
@@ -77,5 +79,10 @@ def find_safe_path(path: str) -> str:
     c = 0
     while os.path.exists(safe_path):
         c += 1
-        safe_path = ".".join([s if i != path.count(".") - 1 else f"{s}_v{c}" for i, s in enumerate(path.split("."))])
+        safe_path = ".".join(
+            [
+                s if i != path.count(".") - 1 else f"{s}_v{c}"
+                for i, s in enumerate(path.split("."))
+            ]
+        )
     return safe_path
