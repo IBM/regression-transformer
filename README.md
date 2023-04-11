@@ -9,7 +9,7 @@ This yields a dichotomous language model that seamlessly integrates regression w
 
 ![Summary](assets/overview.jpg)
 
-This repo contains the development code.
+This repo contains the development code. Read the paper in [*Nature Machine Intelligence*](https://www.nature.com/articles/s42256-022-00580-7).
 
 ## Demo with UI
 🤗 A gradio demo with a simple UI is available on [HuggingFace spaces](https://huggingface.co/spaces/GT4SD/regression_transformer)
@@ -130,11 +130,18 @@ At this point the folder containing the vocabulary file can be used to load a to
 ## Citation
 If you use the regression transformer, please cite:
 ```bib
-@article{born2022regression,
-  title={Regression Transformer enables concurrent sequence regression and generation for molecular language modeling},
+@article{born2023regression,
+  title={Regression Transformer enables concurrent sequence regression and generation for molecular language modelling},
   author={Born, Jannis and Manica, Matteo},
   journal={Nature Machine Intelligence},
-  note={Article in press. arXiv preprint arXiv:2202.01338},
-  year={2023}
+  year={2023},
+  month={04},
+  day={06},
+  volume={},
+  number={},
+  pages={},
+  note={},
+  doi={10.1038/s42256-023-00639-z},
+  url={https://doi.org/10.1038/s42256-023-00639-z},
 }
 ```
