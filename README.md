@@ -9,7 +9,7 @@ This yields a dichotomous language model that seamlessly integrates regression w
 
 ![Summary](assets/overview.jpg)
 
-This repo contains the development code. Read the paper in [*Nature Machine Intelligence*](https://www.nature.com/articles/s42256-022-00580-7).
+This repo contains the development code. Read the paper in [*Nature Machine Intelligence*](https://www.nature.com/articles/s42256-023-00639-z).
 
 ## Demo with UI
 🤗 A gradio demo with a simple UI is available on [HuggingFace spaces](https://huggingface.co/spaces/GT4SD/regression_transformer)
