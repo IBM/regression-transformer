@@ -279,9 +279,11 @@ class ExpressionTokenizer:
             self.text_tokenizer = RegexTokenizer(
                 regex_pattern=BIGSMILES_TOKENIZER_PATTERN
             )
+        elif language == "GroupSELFIES":
+            self.text_tokenizer = SelfiesTokenizer()
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer', 'PSMILES' or 'BigSMILES'."
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer', 'PSMILES' or 'BigSMILES' or 'GroupSELFIES'."
             )
         self.property_tokenizer = PropertyTokenizer()
         self.expression_separator = expression_tokenizer
@@ -377,9 +379,11 @@ class ExpressionBertTokenizer(BertTokenizer):
             self.text_tokenizer = RegexTokenizer(
                 regex_pattern=BIGSMILES_TOKENIZER_PATTERN
             )
+        elif self.language == "GroupSELFIES":
+            return sequence
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES'"
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES' or 'GroupSELFIES'."
             )
 
         self.property_tokenizer = PropertyTokenizer()
@@ -599,6 +603,8 @@ class ExpressionBertTokenizer(BertTokenizer):
         elif self.language == "PSMILES":
             return sequence
         elif self.language == "BigSMILES":
+            return sequence
+        elif self.language == "GroupSELFIES":
             return sequence
         else:
             raise AttributeError(f"Unknown language {self.language}")
