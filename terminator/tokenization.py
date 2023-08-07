@@ -380,7 +380,7 @@ class ExpressionBertTokenizer(BertTokenizer):
                 regex_pattern=BIGSMILES_TOKENIZER_PATTERN
             )
         elif self.language == "GroupSELFIES":
-            return sequence
+            self.text_tokenizer = SelfiesTokenizer()
         else:
             raise ValueError(
                 f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'Polymer' or 'PSMILES' or 'GroupSELFIES'."
