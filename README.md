@@ -134,14 +134,10 @@ If you use the regression transformer, please cite:
   title={Regression Transformer enables concurrent sequence regression and generation for molecular language modelling},
   author={Born, Jannis and Manica, Matteo},
   journal={Nature Machine Intelligence},
+  volume={5},
+  number={4},
+  pages={432--444},
   year={2023},
-  month={04},
-  day={06},
-  volume={},
-  number={},
-  pages={},
-  note={},
-  doi={10.1038/s42256-023-00639-z},
-  url={https://doi.org/10.1038/s42256-023-00639-z},
+  publisher={Nature Publishing Group UK London}
 }
 ```
