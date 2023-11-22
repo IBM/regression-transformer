@@ -30,7 +30,7 @@ In sum, GT4SD provides RT models pretrained on:
 - **small molecules**: single (`qed`, `esol`, `crippen_logp`) or multiple (`logp_and_synthesizability`, `cosmo_acdl`, `pfas`) properties. All those models use SELFIES apart from `crippen_logp` which uses SMILES.
 - **proteins**: `stability`
 - **chemical reactions**: `uspto` (using reaction SMILES)
-- **polymers**: `rop_catalyst` and `block_copolymer`, both described in [Park et al., (2022; ChemRxiv)](https://chemrxiv.org/engage/chemrxiv/article-details/62b60865e84dd185e60214af). The `block_copolymer` model uses the CMDL described in [Park et al., (2022; ChemRxiv)](https://chemrxiv.org/engage/chemrxiv/article-details/62b60865e84dd185e60214af). 
+- **polymers**: `rop_catalyst` and `block_copolymer` are both described in [Park et al., (2023; *Nature Communications*)](https://www.nature.com/articles/s41467-023-39396-3). The `rop_catalyst` uses conventional SELFIES but the `block_copolymer` model uses a novel polymer language called CMDL described also in [Park et al., (2023; *Nature Communications*)](https://www.nature.com/articles/s41467-023-39396-3). 
 
 A jupyter notebook with a toy usecase on adapting a molecule toward solubility is provided in [GT4SD](https://github.com/GT4SD/gt4sd-core/blob/main/notebooks/regression-transformer-demo.ipynb) too.
 If you use [GT4SD](https://github.com/GT4SD/gt4sd-core), you can generate molecules like this:
