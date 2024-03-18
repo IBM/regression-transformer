@@ -1,13 +1,15 @@
 """Tokenization utilties for exrepssions."""
+
 import logging
 import re
 import sys
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Set, Tuple
 
 import torch
 import transformers
-from .selfies import decoder
 from transformers import BertTokenizer
+
+from .selfies import decoder, split_selfies
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -167,6 +169,58 @@ class ReactionSmilesTokenizer(CharacterTokenizer):
         return self.tokenizer.tokenize(text)
 
 
+class ReactionSelfiesTokenizer(SelfiesTokenizer):
+    def __init__(self, precursor_separator: str = ".") -> None:
+        """Constructs an expression tokenizer for SELFIES
+        Args:
+            expression_tokenizer: Separator token for properties and molecule.
+                Defaults to '|'.
+            precursor_separator: a token that separates different precursors from
+                another. Defaults to '.'.
+        """
+        self.tokenizer = self.tokenize_reaction
+        self.precursor_separator = precursor_separator
+
+    def tokenize_reaction(self, x: str) -> List[str]:
+        """Tokenize a SELFIES reaction.
+        Args:
+            text: text to tokenize.
+        Returns:
+            extracted tokens.
+        """
+        if self.precursor_separator in x:
+            if ">>" not in x:
+                logger.error(f"Pass sequence with reaction arrow: {x}")
+                return []
+            prec, post = x.split(">>")
+            pre_tokens = []
+            for pre in prec.split(self.precursor_separator):
+                if pre_tokens != []:
+                    pre_tokens.append(self.precursor_separator)
+                # Otherwise empty molecules ('.') are simply skipped.
+                if pre == ".":
+                    pre_tokens.append(".")
+                else:
+                    pre_tokens.extend(list(split_selfies(pre)))
+
+            post_tokens = []
+            for pos in post.split(self.precursor_separator):
+                if post_tokens != []:
+                    post_tokens.append(self.precursor_separator)
+                if pos == ".":
+                    post_tokens.append(".")
+                else:
+                    post_tokens.extend(list(split_selfies(pos)))
+
+        else:
+            if ">>" not in x:
+                return list(split_selfies(x))
+            pre, post = x.split(">>")
+            pre_tokens = list(split_selfies(pre))
+            post_tokens = list(split_selfies(post))
+        return pre_tokens + [">>"] + post_tokens
+
+
 class PolymerGraphTokenizer:
     def __init__(self) -> None:
         """Constructs a tokenizer for processing string representations of Polymers"""
@@ -216,6 +270,8 @@ class ExpressionTokenizer:
             self.text_tokenizer = CharacterTokenizer()
         elif language == "REACTION_SMILES":
             self.text_tokenizer = PolymerGraphTokenizer()
+        elif language == "REACTION_SELFIES":
+            self.text_tokenizer = ReactionSelfiesTokenizer()
         elif language == "Polymer":
             self.text_tokenizer = CharacterTokenizer()
         else:
@@ -306,11 +362,16 @@ class ExpressionBertTokenizer(BertTokenizer):
                 precursor_separator=precursor_separator
             )
             self.presep = precursor_separator
+        elif language == "REACTION_SELFIES":
+            self.text_tokenizer = ReactionSelfiesTokenizer(
+                precursor_separator=precursor_separator
+            )
+            self.presep = precursor_separator
         elif language == "Polymer":
             self.text_tokenizer = PolymerGraphTokenizer()
         else:
             raise ValueError(
-                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES' or 'Polymer'"
+                f"Unsupported language {language}, choose 'SMILES', 'SELFIES', 'AAS', 'REACTION_SMILES', 'REACTION_SELFIES' or 'Polymer'"
             )
 
         self.property_tokenizer = PropertyTokenizer()
@@ -524,6 +585,20 @@ class ExpressionBertTokenizer(BertTokenizer):
             return sequence
         elif self.language == "REACTION_SMILES":
             return sequence
+        elif self.language == "REACTION_SELFIES":
+            try:
+                pre, prod = sequence.split(">>")
+            except ValueError:
+                return ""
+            # Replace the entity separators
+            pre = pre.replace(self.presep, ".")
+            prod = prod.replace(self.presep, ".")
+            pres = [decoder(p) for p in pre.split(".")]
+            prods = [decoder(p) for p in prod.split(".")]
+            # remove empty entities
+            pres = [p for p in pres if p]
+            prods = [p for p in prods if p]
+            return ".".join(pres) + ">>" + ".".join(prods)
         elif self.language == "Polymer":
             return sequence
         else:
@@ -572,4 +647,5 @@ class InferenceBertTokenizer(ExpressionBertTokenizer):
         """
         text = super().tokenize(*args, **kwargs)
         text = text if len(text) % 2 == 0 else text + [self.pad_token]
+        return text
         return text
