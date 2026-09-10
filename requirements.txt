@@ -1,4 +1,4 @@
-transformers==v3.1.0
+transformers==v5.10.1
 torch==2.13.0
 tqdm
 numpy
